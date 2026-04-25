@@ -4,8 +4,58 @@ import { useApp } from '../context/AppContext';
 import type { Terminal as XTermTerminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
 
-// Track which sessions already have a pty, survive remounts
 const activeSessions = new Set<string>();
+
+let claudeActive = false;
+let lastBusySignal = 0;
+const BUSY_TIMEOUT = 3000;
+
+const CLAUDE_ACTIVE_PATTERN = /Claude.*Code|claude.*v\d/i;
+const CLAUDE_PROMPT_PATTERN = /❯/;
+const SHELL_PROMPT_PATTERN = /(?:\$\s|[#$>]\s*$)/;
+const BUSY_PATTERN = /Processing|Thinking|Reading|Generating|analyzing|tool use/i;
+
+function stripAnsi(str: string): string {
+  return str
+    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
+    .replace(/\x1b\[[\?][0-9;]*[A-Za-z]/g, '')
+    .replace(/\x1b\][^\x07]*\x07/g, '')
+    .replace(/\x1b[^[\]()]?[A-Za-z0-9]/g, '')
+    .replace(/[\x00-\x1f\x7f]/g, '');
+}
+
+export function isClaudeActive() {
+  return claudeActive;
+}
+
+export function isClaudeBusy() {
+  return claudeActive && (Date.now() - lastBusySignal < BUSY_TIMEOUT);
+}
+
+export function switchToSession(projectId: string, sessionId: string, cliPath: string) {
+  if (claudeActive) {
+    // Escape to cancel/dismiss, then send /resume command inside Claude
+    window.electronAPI.writeTerminal(projectId, '\x1b');
+    window.electronAPI.writeTerminal(projectId, `/resume ${sessionId}\r\n`);
+  } else {
+    // Shell idle, start Claude with --resume
+    window.electronAPI.writeTerminal(projectId, `${cliPath} --resume ${sessionId}\r\n`);
+  }
+}
+
+function detectClaudeState(data: string) {
+  const stripped = stripAnsi(data);
+  if (CLAUDE_ACTIVE_PATTERN.test(stripped) || CLAUDE_PROMPT_PATTERN.test(data)) {
+    claudeActive = true;
+  }
+  if (BUSY_PATTERN.test(stripped)) {
+    lastBusySignal = Date.now();
+  }
+  if (SHELL_PROMPT_PATTERN.test(stripped) && !CLAUDE_PROMPT_PATTERN.test(data) && !CLAUDE_ACTIVE_PATTERN.test(stripped)) {
+    claudeActive = false;
+    lastBusySignal = 0;
+  }
+}
 
 export default function TerminalPanel() {
   const { state, updateProject } = useApp();
@@ -72,11 +122,9 @@ export default function TerminalPanel() {
       termRefForFontSize.current = term;
       term.loadAddon(fitAddon);
       term.open(termRef.current!);
-      // Delayed fit — container may not have final dimensions yet
       requestAnimationFrame(() => { if (!cancelled) fitAddon.fit(); });
       if (cancelled) return;
 
-      // Right-click paste, Ctrl+Shift+C/V copy/paste
       termRef.current!.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         if (term.hasSelection()) {
@@ -103,12 +151,16 @@ export default function TerminalPanel() {
       const resizeObserver = new ResizeObserver(() => fitAddon.fit());
       resizeObserver.observe(termRef.current!);
 
-      // Only create pty if not already running
+      const onDataCallback = (sessionId: string, data: string) => {
+        if (sessionId === projectId) {
+          term.write(data);
+          touchSessionTime();
+          detectClaudeState(data);
+        }
+      };
+
       if (activeSessions.has(projectId)) {
-        // Reconnect data listener for existing pty
-        const removeListener = window.electronAPI.onPtyData((sessionId: string, data: string) => {
-          if (sessionId === projectId) { term.write(data); touchSessionTime(); }
-        });
+        const removeListener = window.electronAPI.onPtyData(onDataCallback);
         term.onData(data => window.electronAPI.writeTerminal(projectId, data));
         term.onResize(({ cols, rows }) => window.electronAPI.resizeTerminal(projectId, cols, rows));
         return () => {
@@ -132,9 +184,7 @@ export default function TerminalPanel() {
           return () => { resizeObserver.disconnect(); term.dispose(); };
         }
         activeSessions.add(projectId);
-        const removeListener = window.electronAPI.onPtyData((sessionId: string, data: string) => {
-          if (sessionId === projectId) { term.write(data); touchSessionTime(); }
-        });
+        const removeListener = window.electronAPI.onPtyData(onDataCallback);
         term.onData(data => window.electronAPI.writeTerminal(projectId, data));
         term.onResize(({ cols, rows }) => window.electronAPI.resizeTerminal(projectId, cols, rows));
 
@@ -142,7 +192,6 @@ export default function TerminalPanel() {
           window.electronAPI.writeTerminal(project.id, `${state.settings.claudeCliPath}\r\n`);
         }
 
-        // Listen for PTY exit to clean up
         const removeExitListener = window.electronAPI.onPtyExit((sessionId: string) => {
           if (sessionId === projectId) activeSessions.delete(sessionId);
         });
@@ -173,7 +222,6 @@ export default function TerminalPanel() {
     return () => { cancelled = true; cleanup.then(fn => fn && fn()); };
   }, [project?.id]);
 
-  // Fit terminal when layout changes
   useEffect(() => {
     if (fitAddonRef.current) {
       const timer = setTimeout(() => fitAddonRef.current?.fit(), 100);
@@ -181,7 +229,6 @@ export default function TerminalPanel() {
     }
   }, [state.activePage]);
 
-  // Update terminal font size dynamically
   const termRefForFontSize = useRef<XTermTerminal | null>(null);
   useEffect(() => {
     if (termRefForFontSize.current) {

@@ -479,6 +479,8 @@ body.theme-dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
 .btn-sm:hover { background: var(--hover); }
 .btn-sm.btn-danger { color: var(--danger); border-color: var(--danger); }
 .btn-sm.btn-danger:hover { background: var(--danger); color: #fff; }
+.btn-sm.btn-switch-session { color: var(--accent); border-color: var(--accent); font-size: 13px; line-height: 1; }
+.btn-sm.btn-switch-session:hover { background: var(--accent); color: #fff; }
 
 /* Form */
 .form-group { margin-bottom: 16px; }
@@ -565,7 +567,7 @@ body.theme-dark ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0
 /* Sessions */
 .sessions-list { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 6px; }
 .session-item {
-  padding: 8px 24px 8px 10px; border-radius: var(--radius-md); cursor: pointer;
+  padding: 8px 48px 8px 10px; border-radius: var(--radius-md); cursor: pointer;
   border: 1px solid var(--border); transition: all var(--transition);
   position: relative; margin-bottom: 4px;
 }

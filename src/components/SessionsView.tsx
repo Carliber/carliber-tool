@@ -1,6 +1,7 @@
 import { useState, useEffect, type MouseEvent } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatTime } from '../utils/format';
+import { isClaudeBusy, switchToSession } from './TerminalPanel';
 import type { ClaudeSession, SessionMessage } from '../types/electron';
 
 export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => void }) {
@@ -25,6 +26,14 @@ export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => 
     loadSessions();
   };
 
+  const handleSwitchSession = (e: MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    if (!project) return;
+    const cliPath = state.settings.claudeCliPath || 'claude';
+    if (isClaudeBusy() && !confirm('Claude 正在执行任务，切换将中断当前操作。继续？')) return;
+    switchToSession(project.id, sessionId, cliPath);
+  };
+
   if (!project) return null;
 
   return (
@@ -43,8 +52,12 @@ export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => 
             <span>{s.messageCount} 条</span>
             <span>{formatTime(s.lastModified)}</span>
           </div>
-          <button className="btn-sm btn-danger" style={{ position: 'absolute', right: 4, top: 4 }}
-            onClick={e => handleDelete(e, s.sessionId)}>×</button>
+          <div style={{ position: 'absolute', right: 4, top: 4, display: 'flex', gap: 2 }}>
+            <button className="btn-sm btn-switch-session" title="切换到此会话"
+              onClick={e => handleSwitchSession(e, s.sessionId)}>↗</button>
+            <button className="btn-sm btn-danger" title="删除会话"
+              onClick={e => handleDelete(e, s.sessionId)}>×</button>
+          </div>
         </div>
       ))}
     </div>
