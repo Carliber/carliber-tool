@@ -4,3 +4,4 @@ dist/
 *.tmp
 *.log
 _legacy/target/
+_legacy/dependency-reduced-pom.xml
