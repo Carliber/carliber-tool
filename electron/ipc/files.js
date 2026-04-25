@@ -2,10 +2,19 @@ const path = require('path');
 const fs = require('fs');
 const { IGNORED_DIRS, MAX_FILE_SIZE, atomicWrite, getProjects } = require('../shared');
 
+const CASE_INSENSITIVE = process.platform === 'win32' || process.platform === 'darwin';
+
+function normalizePath(p) {
+  return CASE_INSENSITIVE ? p.toLowerCase() : p;
+}
+
 function isPathAllowed(filePath) {
-  const resolved = path.resolve(filePath).toLowerCase();
+  const resolved = normalizePath(path.resolve(filePath));
   const projects = getProjects();
-  return projects.some(p => resolved.startsWith(path.resolve(p.path).toLowerCase() + path.sep) || resolved === path.resolve(p.path).toLowerCase());
+  return projects.some(p => {
+    const projPath = normalizePath(path.resolve(p.path));
+    return resolved.startsWith(projPath + path.sep) || resolved === projPath;
+  });
 }
 
 const watchers = new Map();

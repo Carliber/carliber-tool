@@ -6,8 +6,19 @@ function register(ipcMain, { mainWindow, dialog }) {
   ipcMain.handle('open-directory', (_, p) => { require('electron').shell.openPath(p); });
   ipcMain.handle('open-native-terminal', (_, cwd) => {
     const { spawn } = require('child_process');
-    const escaped = cwd.replace(/"/g, '\\"');
-    spawn('cmd.exe', ['/c', `start cmd.exe /K "cd /d \\"${escaped}\\"" || echo error`], { detached: true, stdio: 'ignore' }).unref();
+    const platform = process.platform;
+    if (platform === 'win32') {
+      const escaped = cwd.replace(/"/g, '\\"');
+      spawn('cmd.exe', ['/c', `start cmd.exe /K "cd /d \\"${escaped}\\"" || echo error`], { detached: true, stdio: 'ignore' }).unref();
+    } else if (platform === 'darwin') {
+      spawn('open', ['-a', 'Terminal.app', cwd], { detached: true, stdio: 'ignore' }).unref();
+    } else {
+      const terminals = ['gnome-terminal', 'konsole', 'xfce4-terminal', 'xterm'];
+      const term = terminals.find(t => {
+        try { require('child_process').execSync(`which ${t}`, { stdio: 'ignore' }); return true; } catch { return false; }
+      }) || 'xterm';
+      spawn(term, ['--working-directory', cwd], { detached: true, stdio: 'ignore' }).unref();
+    }
   });
   ipcMain.handle('open-directory-picker', async () => {
     const result = await dialog.showOpenDialog(mainWindow, { properties: ['openDirectory'] });
@@ -19,7 +30,8 @@ function register(ipcMain, { mainWindow, dialog }) {
   });
   ipcMain.handle('detect-claude-cli', () => {
     try {
-      return require('child_process').execSync('where claude', { encoding: 'utf-8' }).trim().split('\n')[0].trim();
+      const cmd = process.platform === 'win32' ? 'where claude' : 'which claude';
+      return require('child_process').execSync(cmd, { encoding: 'utf-8' }).trim().split('\n')[0].trim();
     } catch { return null; }
   });
   ipcMain.handle('export-backup', async () => {

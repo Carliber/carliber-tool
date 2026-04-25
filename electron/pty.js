@@ -4,7 +4,12 @@ const sessionOwners = new Map(); // sessionId → webContents id
 function createPty(sessionId, cwd, cols, rows, ownerId) {
   let pty;
   try {
-    pty = require('node-pty').spawn(process.env.COMSPEC || 'cmd.exe', [], {
+    const platform = process.platform;
+    const shell = platform === 'win32'
+      ? (process.env.COMSPEC || 'cmd.exe')
+      : (process.env.SHELL || '/bin/bash');
+    const shellArgs = platform === 'win32' ? [] : [];
+    pty = require('node-pty').spawn(shell, shellArgs, {
       name: 'xterm-256color',
       cols: cols || 80,
       rows: rows || 24,

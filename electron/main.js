@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, dialog, nativeImage, nativeTheme, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const pty = require('./pty');
 const shared = require('./shared');
 const { getDefaultConfig } = require('./ipc/config');
@@ -206,7 +207,7 @@ if (!gotLock) { app.quit(); } else {
     ensureDir(DATA_DIR);
     ensureDir(path.join(DATA_DIR, 'data'));
     // migrate old data
-    const oldProjects = path.join(process.env.USERPROFILE || process.env.HOME, '.claude-tool', 'data', 'projects.json');
+    const oldProjects = path.join(os.homedir(), '.claude-tool', 'data', 'projects.json');
     if (fs.existsSync(oldProjects) && !fs.existsSync(PROJECTS_PATH)) {
       try {
         const migrated = JSON.parse(fs.readFileSync(oldProjects, 'utf-8')).map(p => ({

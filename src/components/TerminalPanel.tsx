@@ -36,7 +36,7 @@ export default function TerminalPanel() {
       const term = new Terminal({
         cursorBlink: true,
         fontSize: state.settings.terminalFontSize || 14,
-        fontFamily: '"Cascadia Mono", Consolas, "Courier New", monospace',
+        fontFamily: '"Cascadia Mono", Consolas, Menlo, "DejaVu Sans Mono", "Liberation Mono", monospace',
         lineHeight: 1.15,
         letterSpacing: 0,
         scrollOnUserInput: true,

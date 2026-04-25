@@ -1,10 +1,12 @@
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
-const DATA_DIR = path.join(process.env.USERPROFILE || process.env.HOME, '.claude-tool-electron');
+const home = os.homedir();
+const DATA_DIR = path.join(home, '.claude-tool-electron');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 const PROJECTS_PATH = path.join(DATA_DIR, 'data', 'projects.json');
-const CLAUDE_DIR = path.join(process.env.USERPROFILE || process.env.HOME, '.claude');
+const CLAUDE_DIR = path.join(home, '.claude');
 const CLAUDE_SETTINGS = path.join(CLAUDE_DIR, 'settings.json');
 const CLAUDE_LOCAL_SETTINGS = path.join(CLAUDE_DIR, 'settings.local.json');
 const CLAUDE_MD = path.join(CLAUDE_DIR, 'CLAUDE.md');
@@ -27,7 +29,16 @@ function readJson(filePath, fallback) {
 function atomicWrite(filePath, data) {
   const tmp = filePath + '.tmp';
   fs.writeFileSync(tmp, data, 'utf-8');
-  fs.renameSync(tmp, filePath);
+  try {
+    fs.renameSync(tmp, filePath);
+  } catch (e) {
+    if (e.code === 'EXDEV') {
+      fs.copyFileSync(tmp, filePath);
+      fs.unlinkSync(tmp);
+    } else {
+      throw e;
+    }
+  }
 }
 
 function writeJson(filePath, data) {
