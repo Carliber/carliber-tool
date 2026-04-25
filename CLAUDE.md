@@ -18,7 +18,9 @@ npm run dist    # Build + electron-builder 打包
 
 ### 双进程
 
-- **Main** (`electron/main.js`)：BrowserWindow 管理、IPC handlers、数据持久化、Tray。纯 CommonJS。
+- **Main** (`electron/main.js`)：BrowserWindow 管理、Tray、生命周期。纯 CommonJS。
+- **IPC 模块** (`electron/ipc/`)：按领域拆分的 IPC handler 注册。`config.js`、`projects.js`、`claude-settings.js`、`sessions.js`、`system.js`、`files.js`、`windows.js`、`pty.js`。每个模块导出 `register(ipcMain)` 函数。
+- **Shared** (`electron/shared.js`)：数据目录常量、JSON 读写（atomicWrite）、规则文件操作、项目缓存、日志工具。所有 IPC 模块共享。
 - **Renderer** (`src/`)：React SPA，通过 `window.electronAPI` (contextBridge) 与 Main 通信。
 - **PTY** (`electron/pty.js`)：node-pty 封装，spawn cmd.exe，通过 IPC 事件转发数据到 xterm.js。
 
@@ -35,6 +37,7 @@ npm run dist    # Build + electron-builder 打包
 - **AppConfig / Projects**：JSON 文件存储在 `%USERPROFILE%/.claude-tool-electron/`。`atomicWrite` 模式（写 .tmp → rename）。
 - **Claude Settings**：读写 `~/.claude/settings.json` 和项目级 `.claude/settings.json`。
 - **Storage 工具** (`src/utils/storage.ts`)：通过 IPC 调用 Main 进程的文件操作。
+- **格式化工具** (`src/utils/format.ts`)：时间格式化等纯函数。
 - **AppContext** (`src/context/AppContext.tsx`)：useReducer + Context，管理项目列表、当前项目、配置、activePage。
 
 ### 组件缓存
@@ -47,9 +50,13 @@ Workspace 内编辑器实例用 `display: none/contents` 切换，不销毁 Code
 
 ### IPC 通道
 
-preload.js 暴露 ~45 个方法，覆盖：配置 CRUD、项目 CRUD、窗口控制、弹窗管理、PTY 终端、Claude settings、会话查询、项目 rules/CLAUDE.md 管理、文件 CRUD（createFile/createDir/renamePath/deletePath）、文件监控（watchDir/unwatchDir + fs-change 事件）。
+preload.js 暴露 ~50 个方法，覆盖：配置 CRUD、项目 CRUD、窗口控制、弹窗管理、PTY 终端、Claude settings、会话查询、项目 rules/CLAUDE.md 管理、文件 CRUD（createFile/createDir/renamePath/deletePath）、文件监控（watchDir/unwatchDir + fs-change 事件）、备份导入导出。
 
 所有文件操作通过 `isPathAllowed()` 限制在已注册项目路径内。
+
+### Claude Settings 面板
+
+`src/components/settings/`：声明式配置 UI。`config-spec.ts` 定义字段规格（类型、分组、选项），`tab-configs.ts` 按 tab 聚合，`ConfigItem.tsx` 根据规格渲染控件。包含 GeneralTab、ClaudeGlobalConfigTab、PermissionsTab、RulesEditor、ProjectTab、InstructionsTab。
 
 ### 文件管理器
 

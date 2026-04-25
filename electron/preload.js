@@ -91,4 +91,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getGlobalRules: () => ipcRenderer.invoke('get-global-rules'),
   saveGlobalRule: (name, content) => ipcRenderer.invoke('save-global-rule', name, content),
   deleteGlobalRule: (name) => ipcRenderer.invoke('delete-global-rule', name),
+
+  // Renderer error reporting
+  reportError: (message, source, line, col, error) => ipcRenderer.send('renderer-error', { message, source, line, col, error: error?.stack || '' }),
 });

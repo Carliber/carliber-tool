@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type MouseEvent, type ReactNode } from 'react';
 import './styles/global.css';
 import { AppProvider, useApp } from './context/AppContext';
 import ProjectSelector from './components/ProjectSelector';
@@ -14,6 +14,14 @@ import { createProject, openDirectoryPicker } from './utils/storage';
 import type { FileEntry } from './types/electron';
 
 const hash = window.location.hash;
+
+// Global error reporting to main process
+window.onerror = (message, source, line, col, error) => {
+  window.electronAPI?.reportError?.(String(message), source || '', line || 0, col || 0, error);
+};
+window.addEventListener('unhandledrejection', (e) => {
+  window.electronAPI?.reportError?.(`Unhandled rejection: ${e.reason}`, '', 0, 0, undefined);
+});
 
 if (hash === '#project-selector') {
   createRoot(document.getElementById('root')!).render(<ProjectSelector />);
@@ -151,7 +159,7 @@ function Workspace() {
     });
   }, []);
 
-  const handleResizeStart = useCallback((side: 'left' | 'right', e: React.MouseEvent) => {
+  const handleResizeStart = useCallback((side: 'left' | 'right', e: MouseEvent) => {
     e.preventDefault();
     draggingRef.current = { side, startX: e.clientX, startWidth: side === 'left' ? sidebarWidth : rightPanelWidth };
     const onMove = (ev: MouseEvent) => {
@@ -347,7 +355,7 @@ const sectionIcons: Record<string, string> = {
 
 function AccordionSection({ title, id, open, onToggle, children }: {
   title: string; id: string; open: boolean;
-  onToggle: (id?: string) => void; children: React.ReactNode;
+  onToggle: (id?: string) => void; children: ReactNode;
 }) {
   return (
     <div className={`accordion-section accordion-${id}`}>

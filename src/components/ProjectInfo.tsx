@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { openDirectory, openNativeTerminal } from '../utils/storage';
 import type { Project } from '../types/electron';

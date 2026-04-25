@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import type { ClaudeSettings } from '../types/electron';
 
 const MODELS = [
   { value: 'opus[1m]', label: 'Opus (默认)' },
@@ -19,7 +20,7 @@ const EFFORTS = [
 ];
 
 export default function ClaudeSettings() {
-  const [settings, setSettings] = useState<Record<string, any> | null>(null);
+  const [settings, setSettings] = useState<ClaudeSettings | null>(null);
   const [claudeMd, setClaudeMd] = useState('');
   const [tab, setTab] = useState('general');
   const [saved, setSaved] = useState(false);
@@ -92,7 +93,7 @@ export default function ClaudeSettings() {
   );
 }
 
-function GeneralTab({ settings, update }: { settings: Record<string, any>; update: (key: string, value: unknown) => void }) {
+function GeneralTab({ settings, update }: { settings: ClaudeSettings; update: (key: string, value: unknown) => void }) {
   return (
     <div className="settings-section">
       <div className="form-group">
@@ -166,7 +167,7 @@ function EnvTab({ env, updateEnv }: { env: Record<string, string>; updateEnv: (k
   );
 }
 
-function PermissionsTab({ permissions, update }: { permissions: Record<string, any>; update: (key: string, value: unknown) => void }) {
+function PermissionsTab({ permissions, update }: { permissions: ClaudeSettings; update: (key: string, value: unknown) => void }) {
   const allowList: string[] = permissions.allow || [];
   const [newRule, setNewRule] = useState('');
 

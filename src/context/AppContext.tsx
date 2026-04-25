@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect, useRef, useCallback } from 'react';
+import { createContext, useContext, useReducer, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import type { Project, AppConfig } from '../types/electron';
 import { loadProjects, saveProjects, loadConfig, saveConfig } from '../utils/storage';
 
@@ -67,7 +67,7 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-export function AppProvider({ children, initialProjectId }: { children: React.ReactNode; initialProjectId?: string }) {
+export function AppProvider({ children, initialProjectId }: { children: ReactNode; initialProjectId?: string }) {
   const [state, dispatch] = useReducer(reducer, {
     ...initialState,
     currentProjectId: initialProjectId || null,

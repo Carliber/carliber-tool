@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, memo, type MouseEvent } from 'react';
 import type { FileEntry } from '../types/electron';
 
 interface TreeNode {
@@ -74,6 +74,29 @@ function filterTree(nodes: TreeNode[], q: string): TreeNode[] {
     }
   }
   return result;
+}
+function RootNewItemInput({ newItem, onCreate, onCancel }: { newItem: { dirPath: string; type: 'file' | 'dir' }; onCreate: (name: string) => void; onCancel: () => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.focus(); }, []);
+  return (
+    <div className="tree-node" style={{ paddingLeft: 4 }}>
+      <span className="tree-arrow-space" />
+      <span className="tree-icon">
+        {newItem.type === 'dir' ? <FileIcon name="" type="dir" /> : <FileIcon name=".txt" type="file" />}
+      </span>
+      <input
+        ref={ref}
+        className="tree-rename-input"
+        placeholder={newItem.type === 'file' ? '文件名' : '文件夹名'}
+        onBlur={e => { if (e.target.value.trim()) onCreate(e.target.value); else onCancel(); }}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { const v = (e.target as HTMLInputElement).value; if (v.trim()) onCreate(v); else onCancel(); }
+          if (e.key === 'Escape') onCancel();
+        }}
+        onClick={e => e.stopPropagation()}
+      />
+    </div>
+  );
 }
 
 export default function FileTree({ projectPath, onFileSelect, activeFilePath }: FileTreeProps) {
@@ -167,7 +190,7 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
     }
   }, [toggleDir, renaming, newItem]);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent, node: TreeNode | null) => {
+  const handleContextMenu = useCallback((e: MouseEvent, node: TreeNode | null) => {
     e.preventDefault();
     e.stopPropagation();
     const rect = treeRef.current?.getBoundingClientRect();
@@ -182,9 +205,13 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
     const trimmed = name.trim();
     if (!trimmed || !newItem) return;
     const fullPath = newItem.dirPath + pathSep(newItem.dirPath) + trimmed;
-    await (newItem.type === 'file'
-      ? window.electronAPI.createFile(fullPath)
-      : window.electronAPI.createDir(fullPath));
+    try {
+      await (newItem.type === 'file'
+        ? window.electronAPI.createFile(fullPath)
+        : window.electronAPI.createDir(fullPath));
+    } catch (e) {
+      alert(`创建失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
     setNewItem(null);
   }, [newItem]);
 
@@ -192,14 +219,24 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
     const trimmed = newName.trim();
     if (!trimmed) { setRenaming(null); return; }
     const newPath = parentDir(id) + pathSep(id) + trimmed;
-    if (newPath !== id) await window.electronAPI.renamePath(id, newPath);
+    if (newPath !== id) {
+      try {
+        await window.electronAPI.renamePath(id, newPath);
+      } catch (e) {
+        alert(`重命名失败: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
     setRenaming(null);
   }, []);
 
   const handleDelete = useCallback(async (node: TreeNode) => {
     const msg = node.type === 'dir' ? `删除文件夹 "${node.name}" 及其所有内容？` : `删除文件 "${node.name}"？`;
     if (!confirm(msg)) return;
-    await window.electronAPI.deletePath(node.path);
+    try {
+      await window.electronAPI.deletePath(node.path);
+    } catch (e) {
+      alert(`删除失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
     setContextMenu(null);
   }, []);
 
@@ -256,6 +293,9 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
         </button>
       </div>
       <div className="file-tree" onContextMenu={e => handleContextMenu(e, null)}>
+        {newItem?.dirPath === projectPath && (
+          <RootNewItemInput newItem={newItem} onCreate={handleCreateFile} onCancel={() => setNewItem(null)} />
+        )}
         {visibleTree.map(node => (
           <TreeNodeView
             key={node.id}
@@ -328,7 +368,7 @@ interface TreeNodeViewProps {
   expanded: Set<string>;
   onClick: (node: TreeNode) => void;
   activeFilePath?: string;
-  onContextMenu: (e: React.MouseEvent, node: TreeNode | null) => void;
+  onContextMenu: (e: MouseEvent, node: TreeNode | null) => void;
   renaming: { id: string; name: string } | null;
   onRename: (id: string, newName: string) => void;
   onStartRename: (v: { id: string; name: string } | null) => void;
@@ -337,7 +377,7 @@ interface TreeNodeViewProps {
   onCancelCreate: () => void;
 }
 
-const TreeNodeView = React.memo(function TreeNodeView({
+const TreeNodeView = memo(function TreeNodeView({
   node, depth, expanded, onClick, activeFilePath,
   onContextMenu, renaming, onRename, onStartRename,
   newItem, onCreate, onCancelCreate,

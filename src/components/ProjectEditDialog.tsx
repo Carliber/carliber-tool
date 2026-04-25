@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { createProject, updateProject, openDirectoryPicker } from '../utils/storage';
 import type { Project } from '../types/electron';
 
@@ -20,14 +20,13 @@ export default function ProjectEditDialog({ project, onSave, onClose }: {
   const [description, setDescription] = useState(project.description || '');
   const [tags, setTags] = useState((project.tags || []).join(', '));
   const [status, setStatus] = useState<Project['status']>(project.status || 'active');
-  const [pathWarning, setPathWarning] = useState('');
 
   const handleBrowse = async () => {
     const dir = await openDirectoryPicker();
     if (dir) setPath(dir);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -54,7 +53,6 @@ export default function ProjectEditDialog({ project, onSave, onClose }: {
               <input value={path} onChange={e => setPath(e.target.value)} placeholder="项目路径" style={{ flex: 1 }} />
               <button type="button" onClick={handleBrowse}>浏览</button>
             </div>
-            {pathWarning && <div className="form-warning">{pathWarning}</div>}
           </div>
           <div className="form-group">
             <label>描述</label>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { useApp } from '../context/AppContext';
 import type { Terminal as XTermTerminal } from '@xterm/xterm';

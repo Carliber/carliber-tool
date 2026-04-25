@@ -13,12 +13,13 @@ export interface Project {
 export interface AppConfig {
   theme: 'light' | 'dark';
   claudeCliPath: string;
-  dataDir: string;
+  dataDir?: string;
   windowWidth: number;
   windowHeight: number;
   windowX: number;
   windowY: number;
-  lastPage: string;
+  lastPage?: string;
+  closeAction?: 'ask' | 'minimize' | 'quit';
   uiFontSize: number;
   editorFontSize: number;
   terminalFontSize: number;
@@ -128,9 +129,10 @@ interface ElectronAPI {
   createDir: (dirPath: string) => Promise<boolean>;
   renamePath: (oldPath: string, newPath: string) => Promise<boolean>;
   deletePath: (path: string) => Promise<boolean>;
-  watchDir: (dirPath: string) => Promise<void>;
+  watchDir: (dirPath: string) => Promise<boolean | void>;
   unwatchDir: (dirPath: string) => Promise<void>;
   onFsChange: (callback: (event: { type: string; filename: string; dir: string }) => void) => () => void;
+  reportError: (message: string, source: string, line: number, col: number, error: string | undefined) => void;
 }
 
 declare global {

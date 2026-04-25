@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, type MouseEvent } from 'react';
 import { useApp } from '../context/AppContext';
+import { formatTime } from '../utils/format';
 import type { ClaudeSession, SessionMessage } from '../types/electron';
 
 export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => void }) {
@@ -17,7 +18,7 @@ export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => 
     setSessions(list);
   };
 
-  const handleDelete = async (e: React.MouseEvent, sessionId: string) => {
+  const handleDelete = async (e: MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (!project || !confirm('删除此会话？不可恢复。')) return;
     await window.electronAPI.deleteSession(project.path, sessionId);
@@ -85,14 +86,4 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
       </div>
     </div>
   );
-}
-
-function formatTime(iso: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  const diff = Date.now() - d.getTime();
-  if (diff < 60000) return '刚刚';
-  if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
-  if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
-  return `${d.getMonth() + 1}-${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }

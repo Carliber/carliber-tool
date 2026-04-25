@@ -1,6 +1,7 @@
 const sessions = new Map();
+const sessionOwners = new Map(); // sessionId → webContents id
 
-function createPty(sessionId, cwd, cols, rows) {
+function createPty(sessionId, cwd, cols, rows, ownerId) {
   let pty;
   try {
     pty = require('node-pty').spawn(process.env.COMSPEC || 'cmd.exe', [], {
@@ -15,6 +16,7 @@ function createPty(sessionId, cwd, cols, rows) {
   }
 
   sessions.set(sessionId, pty);
+  if (ownerId !== undefined) sessionOwners.set(sessionId, ownerId);
   return pty;
 }
 
@@ -44,4 +46,10 @@ function killAll() {
   for (const [id] of sessions) killPty(id);
 }
 
-module.exports = { createPty, getPty, writePty, resizePty, killPty, killAll };
+function killByOwner(ownerId) {
+  for (const [sessionId, oid] of sessionOwners) {
+    if (oid === ownerId) killPty(sessionId);
+  }
+}
+
+module.exports = { createPty, getPty, writePty, resizePty, killPty, killAll, killByOwner };
