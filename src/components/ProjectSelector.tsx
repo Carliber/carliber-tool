@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { createProject } from '../utils/storage';
 import { formatTime } from '../utils/format';
 import type { Project, ScannedProject } from '../types/electron';
 import ProjectEditDialog from './ProjectEditDialog';
+import Titlebar from './Titlebar';
+import { scanNewClaudeProjects, importScannedProjects } from '../utils/project-scan';
 
 export default function ProjectSelector() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -33,28 +34,19 @@ export default function ProjectSelector() {
   const reload = () => loadProjects();
 
   const handleScanClaude = async () => {
-    const scanned = await window.electronAPI.scanClaudeProjects();
-    const existing = await window.electronAPI.getProjects();
-    const existingPaths = new Set(existing.map(p => p.path));
-    const newOnes = scanned.filter(p => !existingPaths.has(p.path));
+    const newOnes = await scanNewClaudeProjects();
     setClaudeProjects(newOnes);
     setShowImport(true);
   };
 
   const handleImportAll = async () => {
-    const all = await window.electronAPI.getProjects();
-    for (const cp of claudeProjects) {
-      all.push(createProject({ name: cp.name, path: cp.path, status: 'active' }));
-    }
-    await window.electronAPI.saveProjects(all);
+    await importScannedProjects(claudeProjects);
     setShowImport(false);
     reload();
   };
 
   const handleImportOne = async (cp: ScannedProject) => {
-    const all = await window.electronAPI.getProjects();
-    all.push(createProject({ name: cp.name, path: cp.path, status: 'active' }));
-    await window.electronAPI.saveProjects(all);
+    await importScannedProjects([cp]);
     setClaudeProjects(prev => prev.filter(p => p.path !== cp.path));
     reload();
   };
@@ -89,6 +81,9 @@ export default function ProjectSelector() {
 
   return (
     <div className={window.location.hash === '#project-selector' ? 'popup-root' : 'project-selector-inline'}>
+      {window.location.hash === '#project-selector' && (
+        <Titlebar title="选择项目" showMaximize={false} />
+      )}
       <div className="popup-body">
         <div className="selector-toolbar">
           <input className="selector-search" placeholder="搜索项目..."

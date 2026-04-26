@@ -25,6 +25,7 @@ export interface AppConfig {
   terminalFontSize: number;
   treeFontSize: number;
   rightPanelOpen?: boolean;
+  beautifyTerminal?: boolean;
 }
 
 export interface ClaudeSession {
@@ -56,6 +57,16 @@ export interface FileEntry {
   type: 'file' | 'dir';
   size: number;
   mtime: string;
+  kind?: 'app-settings' | 'claude-global' | 'chat' | 'terminal';
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  text: string;
+  ts: number;
+  tools?: { name: string; input: string; output?: string }[];
+  loading?: boolean;
 }
 
 export interface FileContent {

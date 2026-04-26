@@ -193,12 +193,22 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
   const handleContextMenu = useCallback((e: MouseEvent, node: TreeNode | null) => {
     e.preventDefault();
     e.stopPropagation();
-    const rect = treeRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const container = treeRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
     const dirPath = node
       ? (node.type === 'dir' ? node.path : parentDir(node.path))
       : projectPath;
-    setContextMenu({ x: e.clientX - rect.left, y: e.clientY - rect.top, node, dirPath });
+    // Position menu so mouse is at top-left, adjust if overflowing viewport
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    const menuWidth = 160;
+    const menuHeight = node ? 100 : 90;
+    if (e.clientX + menuWidth > window.innerWidth) x = x - menuWidth;
+    if (e.clientY + menuHeight > window.innerHeight) y = y - menuHeight;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    setContextMenu({ x, y, node, dirPath });
   }, [projectPath]);
 
   const handleCreateFile = useCallback(async (name: string) => {

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ClaudeSettings } from '../types/electron';
+import Titlebar from './Titlebar';
+import { PermissionsEditor } from './settings/PermissionsTab';
 
 const MODELS = [
   { value: 'opus[1m]', label: 'Opus (默认)' },
@@ -58,6 +60,7 @@ export default function ClaudeSettings() {
 
   return (
     <div className="popup-root">
+      <Titlebar title="Claude 全局设置" showMaximize={false} />
       <div className="popup-body">
       <div className="claude-settings-header">
         <h2 className="title-lg">Claude 全局设置</h2>
@@ -84,7 +87,14 @@ export default function ClaudeSettings() {
       <div className="claude-settings-body">
         {tab === 'general' && <GeneralTab settings={settings} update={update} />}
         {tab === 'env' && <EnvTab env={settings.env || {}} updateEnv={updateEnv} />}
-        {tab === 'permissions' && <PermissionsTab permissions={settings.permissions || {}} update={update} />}
+        {tab === 'permissions' && (
+          <div className="settings-section">
+            <p className="text-sm text-muted" style={{ marginBottom: 12 }}>
+              允许的权限规则（{((settings.permissions || {}).allow || []).length} 条）
+            </p>
+            <PermissionsEditor permissions={settings.permissions || {}} update={update} />
+          </div>
+        )}
         {tab === 'plugins' && <PluginsTab plugins={settings.enabledPlugins || {}} update={update} />}
         {tab === 'instructions' && <InstructionsTab value={claudeMd} onChange={setClaudeMd} />}
       </div>
@@ -162,56 +172,6 @@ function EnvTab({ env, updateEnv }: { env: Record<string, string>; updateEnv: (k
         <button onClick={() => { if (newKey.trim()) { updateEnv(newKey.trim(), ''); setNewKey(''); } }}>
           添加
         </button>
-      </div>
-    </div>
-  );
-}
-
-function PermissionsTab({ permissions, update }: { permissions: ClaudeSettings; update: (key: string, value: unknown) => void }) {
-  const allowList: string[] = permissions.allow || [];
-  const [newRule, setNewRule] = useState('');
-
-  const addRule = () => {
-    if (!newRule.trim()) return;
-    update('permissions', { ...permissions, allow: [...allowList, newRule.trim()] });
-    setNewRule('');
-  };
-
-  const removeRule = (index: number) => {
-    const list = [...allowList];
-    list.splice(index, 1);
-    update('permissions', { ...permissions, allow: list });
-  };
-
-  const grouped: Record<string, { rule: string; index: number }[]> = {};
-  allowList.forEach((r: string, i: number) => {
-    const tool = r.match(/^(\w+)\(/)?.[1] || 'other';
-    if (!grouped[tool]) grouped[tool] = [];
-    grouped[tool].push({ rule: r, index: i });
-  });
-
-  return (
-    <div className="settings-section">
-      <p className="text-sm text-muted" style={{ marginBottom: 12 }}>
-        允许的权限规则（{allowList.length} 条）
-      </p>
-      {Object.entries(grouped).map(([tool, rules]) => (
-        <div key={tool} style={{ marginBottom: 12 }}>
-          <div className="text-sm text-bold" style={{ marginBottom: 4 }}>{tool}</div>
-          {rules.map(({ rule, index }) => (
-            <div key={index} className="permission-row">
-              <code className="text-sm">{rule}</code>
-              <button className="btn-sm btn-danger" onClick={() => removeRule(index)}>×</button>
-            </div>
-          ))}
-        </div>
-      ))}
-      <div className="separator" />
-      <div style={{ display: 'flex', gap: 8 }}>
-        <input value={newRule} placeholder='如 Bash(git push*)' style={{ flex: 1 }}
-          onChange={e => setNewRule(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addRule()} />
-        <button className="primary" onClick={addRule}>添加规则</button>
       </div>
     </div>
   );

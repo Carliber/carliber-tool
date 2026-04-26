@@ -1,7 +1,7 @@
 import { useState, useEffect, type MouseEvent } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatTime } from '../utils/format';
-import { isClaudeBusy, switchToSession } from './TerminalPanel';
+import { isClaudeBusy, switchToSession } from '../hooks/useClaudeState';
 import type { ClaudeSession, SessionMessage } from '../types/electron';
 
 export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => void }) {

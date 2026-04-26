@@ -1,20 +1,46 @@
 const sessions = new Map();
 const sessionOwners = new Map(); // sessionId → webContents id
+const fs = require('fs');
+const os = require('os');
 
 function createPty(sessionId, cwd, cols, rows, ownerId) {
   let pty;
   try {
     const platform = process.platform;
-    const shell = platform === 'win32'
-      ? (process.env.COMSPEC || 'cmd.exe')
-      : (process.env.SHELL || '/bin/bash');
-    const shellArgs = platform === 'win32' ? [] : [];
+    let shell, shellArgs, gitBash = null;
+    if (platform === 'win32') {
+      const homeDir = os.homedir();
+      const programFiles = process.env.ProgramFiles || '';
+      const localAppData = process.env.LocalAppData || '';
+      const gitBashPaths = [
+        homeDir + '\\scoop\\apps\\git\\current\\bin\\bash.exe',
+        homeDir + '\\scoop\\apps\\git\\current\\usr\\bin\\bash.exe',
+        programFiles + '\\Git\\bin\\bash.exe',
+        programFiles + '\\Git\\usr\\bin\\bash.exe',
+        localAppData + '\\Programs\\Git\\bin\\bash.exe',
+      ];
+      gitBash = gitBashPaths.find(p => { try { return fs.existsSync(p); } catch { return false; } });
+      if (gitBash) {
+        shell = gitBash;
+        shellArgs = ['--login', '-i'];
+      } else {
+        shell = process.env.COMSPEC || 'cmd.exe';
+        shellArgs = [];
+      }
+    } else {
+      shell = process.env.SHELL || '/bin/bash';
+      shellArgs = [];
+    }
     pty = require('node-pty').spawn(shell, shellArgs, {
       name: 'xterm-256color',
       cols: cols || 80,
       rows: rows || 24,
       cwd: cwd,
-      env: Object.assign({}, process.env, { TERM: 'xterm-256color', COLUMNS: String(cols || 80) }),
+      env: Object.assign({}, process.env, {
+        TERM: 'xterm-256color',
+        COLUMNS: String(cols || 80),
+        CLAUDE_CODE_GIT_BASH_PATH: gitBash || process.env.CLAUDE_CODE_GIT_BASH_PATH || '',
+      }),
     });
   } catch {
     return null;

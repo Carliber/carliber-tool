@@ -4,10 +4,14 @@ import { AppProvider, useApp } from './context/AppContext';
 import ProjectSelector from './components/ProjectSelector';
 import ClaudeSettings from './components/ClaudeSettings';
 import Sidebar from './components/Sidebar';
+import Titlebar from './components/Titlebar';
 import ProjectInfo from './components/ProjectInfo';
 import TerminalPanel from './components/TerminalPanel';
 import { SessionList, SessionDetail } from './components/SessionsView';
 import Settings from './components/Settings';
+import ClaudeChat from './components/ClaudeChat';
+import type { ClaudeChatHandle } from './components/ClaudeChat';
+import StatusBar from './components/StatusBar';
 import FileEditor from './components/FileEditor';
 import { createRoot } from 'react-dom/client';
 import { createProject, openDirectoryPicker } from './utils/storage';
@@ -45,6 +49,7 @@ if (hash === '#project-selector') {
 function Hub() {
   return (
     <div className="app-root">
+      <Titlebar title="Claude Tool" />
       <div className="app-body">
         <div className="empty-workspace">
           <h2>Claude Tool</h2>
@@ -64,7 +69,6 @@ function Workspace() {
   const [openFiles, setOpenFiles] = useState<FileEntry[]>([]);
   const [activeFileIndex, setActiveFileIndex] = useState(-1);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [overlayView, setOverlayView] = useState<'app-settings' | 'claude-global' | null>(null);
   const [showFileMenu, setShowFileMenu] = useState(false);
   const [showSidebar, setShowSidebar] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(false);
@@ -80,32 +84,42 @@ function Workspace() {
   addProjectRef.current = addProject;
   const openSectionsRef = useRef(openSections);
   openSectionsRef.current = openSections;
+  const chatRef = useRef<ClaudeChatHandle>(null);
 
   const activeFile = activeFileIndex >= 0 ? openFiles[activeFileIndex] ?? null : null;
 
   const handleFileSelect = useCallback((entry: FileEntry) => {
-    setOpenFiles(prev => {
-      const idx = prev.findIndex(f => f.path === entry.path);
-      if (idx >= 0) {
-        setActiveFileIndex(idx);
-        return prev;
-      }
-      setActiveFileIndex(prev.length);
-      return [...prev, entry];
-    });
-  }, []);
+    setActiveSessionId(null);
+    const existing = openFiles.findIndex(f => f.path === entry.path);
+    if (existing >= 0) {
+      setActiveFileIndex(existing);
+      return;
+    }
+    setActiveFileIndex(openFiles.length);
+    setOpenFiles([...openFiles, entry]);
+  }, [openFiles]);
 
   const handleCloseFile = useCallback((index: number) => {
-    setOpenFiles(prev => {
-      const next = prev.filter((_, i) => i !== index);
-      setActiveFileIndex(i => {
-        if (i >= next.length) return next.length - 1;
-        if (i > index) return i - 1;
-        return i;
-      });
-      return next;
+    const next = openFiles.filter((_, i) => i !== index);
+    setOpenFiles(next);
+    setActiveFileIndex(i => {
+      if (i >= next.length) return next.length - 1;
+      if (i > index) return i - 1;
+      return i;
     });
-  }, []);
+  }, [openFiles]);
+
+  const openSettingsTab = useCallback((kind: 'app-settings' | 'claude-global') => {
+    const virtualPath = `__virtual__::${kind}`;
+    const name = kind === 'app-settings' ? '选项' : '设置';
+    const existing = openFiles.findIndex(f => f.path === virtualPath);
+    if (existing >= 0) {
+      setActiveFileIndex(existing);
+      return;
+    }
+    setActiveFileIndex(openFiles.length);
+    setOpenFiles([...openFiles, { name, path: virtualPath, type: 'file', size: 0, mtime: '', kind }]);
+  }, [openFiles]);
 
   const recentProjects = useMemo(() => {
     return [...state.projects].sort((a, b) =>
@@ -249,10 +263,10 @@ function Workspace() {
               </div>
             )}
           </div>
-          <div className={`menubar-item ${overlayView === 'app-settings' ? 'active' : ''}`} onClick={() => setOverlayView(prev => prev === 'app-settings' ? null : 'app-settings')}>
+          <div className={`menubar-item ${activeFile?.kind === 'app-settings' ? 'active' : ''}`} onClick={() => openSettingsTab('app-settings')}>
             选项
           </div>
-          <div className={`menubar-item ${overlayView === 'claude-global' ? 'active' : ''}`} onClick={() => setOverlayView(prev => prev === 'claude-global' ? null : 'claude-global')}>
+          <div className={`menubar-item ${activeFile?.kind === 'claude-global' ? 'active' : ''}`} onClick={() => openSettingsTab('claude-global')}>
             设置
           </div>
         </div>
@@ -260,6 +274,11 @@ function Workspace() {
           <div className={`menubar-item menubar-project ${showRightPanel ? 'active' : ''}`}
             onClick={() => toggleRightPanel()}>
             {project.name}
+          </div>
+          <div className="titlebar-controls">
+            <button className="titlebar-btn" onClick={() => window.electronAPI.minimizeWindow()} title="最小化">&#x2500;</button>
+            <button className="titlebar-btn" onClick={() => window.electronAPI.maximizeWindow()} title="最大化">&#x25A1;</button>
+            <button className="titlebar-btn titlebar-btn-close" onClick={() => window.electronAPI.closeWindow()} title="关闭">&#x2715;</button>
           </div>
         </div>
       </div>
@@ -276,55 +295,55 @@ function Workspace() {
           </>
         ) : null}
         <div className="workspace-main" ref={workspaceMainRef}>
-          <div className="workspace-terminal">
-            <TerminalPanel />
+          <div className="editor-tabs">
+            {openFiles.map((f, i) => (
+              <div
+                key={f.path}
+                className={`editor-tab ${i === activeFileIndex ? 'editor-tab-active' : ''}`}
+                onClick={() => setActiveFileIndex(i)}
+              >
+                <span className="editor-tab-name">{f.name}</span>
+                <button className="editor-tab-close" onClick={e => { e.stopPropagation(); handleCloseFile(i); }}>✕</button>
+              </div>
+            ))}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', padding: '0 8px', gap: 4 }}>
+              <button className={`editor-tab-toggle ${state.settings.beautifyTerminal !== false ? 'active' : ''}`}
+                onClick={() => updateSettings({ ...state.settings, beautifyTerminal: state.settings.beautifyTerminal === false })}
+                title={state.settings.beautifyTerminal !== false ? '切换原始终端' : '切换对话界面'}>
+                {state.settings.beautifyTerminal !== false ? '💬' : '⌨'}
+              </button>
+            </div>
           </div>
-          {openFiles.length > 0 && (
-            <div className="workspace-editor">
-              <div className="editor-tabs">
-                {openFiles.map((f, i) => (
-                  <div
-                    key={f.path}
-                    className={`editor-tab ${i === activeFileIndex ? 'editor-tab-active' : ''}`}
-                    onClick={() => setActiveFileIndex(i)}
-                  >
-                    <span className="editor-tab-name">{f.name}</span>
-                    <button className="editor-tab-close" onClick={e => { e.stopPropagation(); handleCloseFile(i); }}>✕</button>
-                  </div>
-                ))}
-              </div>
-              <div className="editor-tab-panels">
-                {openFiles.map((f, i) => (
-                  <div key={f.path} style={{ display: i === activeFileIndex ? 'contents' : 'none' }}>
-                    <FileEditor
-                      file={f}
-                      onClose={() => handleCloseFile(i)}
-                      theme={theme}
-                      fontSize={state.settings.editorFontSize || 13}
-                    />
-                  </div>
-                ))}
-              </div>
+          <div className="workspace-content">
+            <div className="workspace-terminal" style={{ display: (openFiles.length > 0 || activeSessionId) ? 'none' : 'flex' }}>
+              {state.settings.beautifyTerminal !== false ? <ClaudeChat ref={chatRef} /> : <TerminalPanel />}
             </div>
-          )}
-          {activeSessionId && (
-            <div className="workspace-editor">
-              <SessionDetail sessionId={activeSessionId} onClose={() => setActiveSessionId(null)} />
-            </div>
-          )}
-          {overlayView && (
-            <div className="workspace-editor">
-              <div className="overlay-view">
-                <div className="overlay-view-bar">
-                  <span className="text-sm">{overlayView === 'app-settings' ? '选项' : '全局设置'}</span>
-                  <button className="btn-sm" onClick={() => setOverlayView(null)}>✕</button>
-                </div>
-                <div className="overlay-view-body">
-                  <Settings mode={overlayView === 'app-settings' ? 'app' : 'claude-global'} />
+            {openFiles.length > 0 && !activeSessionId && (
+              <div className="workspace-editor">
+                <div className="editor-tab-panels">
+                  {openFiles.map((f, i) => (
+                    <div key={f.path} style={{ display: i === activeFileIndex ? 'contents' : 'none' }}>
+                      {f.kind === 'app-settings' || f.kind === 'claude-global' ? (
+                        <Settings key={f.path} mode={f.kind === 'app-settings' ? 'app' : 'claude-global'} />
+                      ) : (
+                        <FileEditor
+                          file={f}
+                          onClose={() => handleCloseFile(i)}
+                          theme={theme}
+                          fontSize={state.settings.editorFontSize || 13}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+            {activeSessionId && (
+              <div className="workspace-editor">
+                <SessionDetail sessionId={activeSessionId} onClose={() => setActiveSessionId(null)} />
+              </div>
+            )}
+          </div>
         </div>
         {showRightPanel && (
           <>
@@ -334,7 +353,7 @@ function Workspace() {
               <ProjectInfo />
             </AccordionSection>
             <AccordionSection title="会话记录" id="sessions" open={openSections.has('sessions')} onToggle={toggleSection}>
-              <SessionList onOpenSession={(id) => setActiveSessionId(id)} />
+              <SessionList onOpenSession={(id) => { setActiveSessionId(id); chatRef.current?.loadSession(id); }} />
             </AccordionSection>
             <AccordionSection title="项目配置" id="config" open={openSections.has('config')} onToggle={toggleSection}>
               <Settings mode="claude-project" />
@@ -343,14 +362,15 @@ function Workspace() {
           </>
         )}
       </div>
+      <StatusBar />
     </div>
   );
 }
 
-const sectionIcons: Record<string, string> = {
-  info: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 5v.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-  sessions: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 6h6M5 8.5h4M5 11h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
-  config: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>',
+const sectionIcons: Record<string, ReactNode> = {
+  info: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+  sessions: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M5 6h6M5 8.5h4M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+  config: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
 };
 
 function AccordionSection({ title, id, open, onToggle, children }: {
@@ -363,7 +383,7 @@ function AccordionSection({ title, id, open, onToggle, children }: {
         <span className={`accordion-arrow ${open ? 'accordion-arrow-open' : ''}`}>
           <svg width="10" height="10" viewBox="0 0 10 10"><path d="M3 1l4 4-4 4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
         </span>
-        <span className="accordion-icon" dangerouslySetInnerHTML={{ __html: sectionIcons[id] || '' }} />
+        <span className="accordion-icon">{sectionIcons[id]}</span>
         <span className="accordion-title">{title}</span>
       </div>
       {open && <div className="accordion-body">{children}</div>}

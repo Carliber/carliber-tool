@@ -3,59 +3,11 @@ import '@xterm/xterm/css/xterm.css';
 import { useApp } from '../context/AppContext';
 import type { Terminal as XTermTerminal } from '@xterm/xterm';
 import type { FitAddon } from '@xterm/addon-fit';
+import { detectClaudeState, isClaudeActive, isClaudeBusy, switchToSession } from '../hooks/useClaudeState';
+
+export { isClaudeActive, isClaudeBusy, switchToSession };
 
 const activeSessions = new Set<string>();
-
-let claudeActive = false;
-let lastBusySignal = 0;
-const BUSY_TIMEOUT = 3000;
-
-const CLAUDE_ACTIVE_PATTERN = /Claude.*Code|claude.*v\d/i;
-const CLAUDE_PROMPT_PATTERN = /❯/;
-const SHELL_PROMPT_PATTERN = /(?:\$\s|[#$>]\s*$)/;
-const BUSY_PATTERN = /Processing|Thinking|Reading|Generating|analyzing|tool use/i;
-
-function stripAnsi(str: string): string {
-  return str
-    .replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')
-    .replace(/\x1b\[[\?][0-9;]*[A-Za-z]/g, '')
-    .replace(/\x1b\][^\x07]*\x07/g, '')
-    .replace(/\x1b[^[\]()]?[A-Za-z0-9]/g, '')
-    .replace(/[\x00-\x1f\x7f]/g, '');
-}
-
-export function isClaudeActive() {
-  return claudeActive;
-}
-
-export function isClaudeBusy() {
-  return claudeActive && (Date.now() - lastBusySignal < BUSY_TIMEOUT);
-}
-
-export function switchToSession(projectId: string, sessionId: string, cliPath: string) {
-  if (claudeActive) {
-    // Escape to cancel/dismiss, then send /resume command inside Claude
-    window.electronAPI.writeTerminal(projectId, '\x1b');
-    window.electronAPI.writeTerminal(projectId, `/resume ${sessionId}\r\n`);
-  } else {
-    // Shell idle, start Claude with --resume
-    window.electronAPI.writeTerminal(projectId, `${cliPath} --resume ${sessionId}\r\n`);
-  }
-}
-
-function detectClaudeState(data: string) {
-  const stripped = stripAnsi(data);
-  if (CLAUDE_ACTIVE_PATTERN.test(stripped) || CLAUDE_PROMPT_PATTERN.test(data)) {
-    claudeActive = true;
-  }
-  if (BUSY_PATTERN.test(stripped)) {
-    lastBusySignal = Date.now();
-  }
-  if (SHELL_PROMPT_PATTERN.test(stripped) && !CLAUDE_PROMPT_PATTERN.test(data) && !CLAUDE_ACTIVE_PATTERN.test(stripped)) {
-    claudeActive = false;
-    lastBusySignal = 0;
-  }
-}
 
 export default function TerminalPanel() {
   const { state, updateProject } = useApp();
@@ -122,7 +74,7 @@ export default function TerminalPanel() {
       termRefForFontSize.current = term;
       term.loadAddon(fitAddon);
       term.open(termRef.current!);
-      requestAnimationFrame(() => { if (!cancelled) fitAddon.fit(); });
+      fitAddon.fit();
       if (cancelled) return;
 
       termRef.current!.addEventListener('contextmenu', (e) => {

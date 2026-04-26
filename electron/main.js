@@ -11,6 +11,12 @@ const preloadPath = path.join(__dirname, 'preload.js');
 const distIndexPath = path.join(__dirname, '..', 'dist', 'index.html');
 const isDev = process.argv.includes('--dev') || process.env.CLAUDE_TOOL_DEV === '1';
 
+// IME support for WSL/Linux
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('ozone-platform', 'x11');
+  app.commandLine.appendSwitch('enable-features', 'ImeV2');
+}
+
 function setupCsp() {
   if (isDev) return;
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -43,7 +49,7 @@ function createPopupWindow(hash, opts) {
   const url = getLoadURL(hash);
   const win = new BrowserWindow({
     width: opts.width || 720, height: opts.height || 560, minWidth: opts.minWidth || 480, minHeight: opts.minHeight || 400,
-    frame: true, title: opts.title || '', resizable: true, parent: mainWindow, modal: false, show: false, autoHideMenuBar: true,
+    frame: false, title: opts.title || '', resizable: true, parent: mainWindow, modal: false, show: false, autoHideMenuBar: true,
     webPreferences: { preload: preloadPath, contextIsolation: true, nodeIntegration: false },
   });
   win.loadURL(url);
@@ -66,7 +72,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: config.windowWidth || 1280, height: config.windowHeight || 800, minWidth: 960, minHeight: 600,
     ...(config.windowX >= 0 && config.windowY >= 0 ? { x: config.windowX, y: config.windowY } : {}),
-    frame: true, show: false, autoHideMenuBar: true, title: 'Claude Tool',
+    frame: false, show: false, autoHideMenuBar: true, title: 'Claude Tool',
     webPreferences: { preload: preloadPath, contextIsolation: true, nodeIntegration: false },
   });
   mainWindow.loadURL(getLoadURL(''));
@@ -87,7 +93,7 @@ function createWindow() {
       const lastProject = sorted[0];
       if (lastProject && lastProject.id) {
         const win = new BrowserWindow({
-          width: 1280, height: 800, minWidth: 960, minHeight: 600, frame: true,
+          width: 1280, height: 800, minWidth: 960, minHeight: 600, frame: false,
           title: lastProject.name, show: false, autoHideMenuBar: true,
           webPreferences: { preload: preloadPath, contextIsolation: true, nodeIntegration: false },
         });
@@ -172,7 +178,7 @@ ipcMain.on('select-project', (_, projectId) => {
   const projects = getProjects();
   const proj = projects.find(p => p.id === projectId);
   const win = new BrowserWindow({
-    width: 1280, height: 800, minWidth: 960, minHeight: 600, frame: true,
+    width: 1280, height: 800, minWidth: 960, minHeight: 600, frame: false,
     title: proj ? proj.name : 'Claude Tool', show: false, autoHideMenuBar: true,
     webPreferences: { preload: preloadPath, contextIsolation: true, nodeIntegration: false },
   });

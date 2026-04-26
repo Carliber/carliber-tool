@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { detectClaudeCli, exportBackup, importBackup, createProject } from '../../utils/storage';
+import { detectClaudeCli, exportBackup, importBackup } from '../../utils/storage';
+import { scanAndMergeProjects } from '../../utils/project-scan';
 import type { AppConfig } from '../../types/electron';
 
 export default function GeneralTab({ settings, handleChange, cliStatus, onDetect }: {
@@ -13,26 +14,7 @@ export default function GeneralTab({ settings, handleChange, cliStatus, onDetect
     setScanning(true);
     setScanResult('');
     try {
-      const scanned = await window.electronAPI.scanClaudeProjects();
-      const existing = await window.electronAPI.getProjects();
-      const existingPaths = new Map(existing.map(p => [p.path, p]));
-      const updated = [...existing];
-      let newCount = 0;
-      let updatedCount = 0;
-      for (const sp of scanned) {
-        if (existingPaths.has(sp.path)) {
-          if (sp.lastModified) {
-            const p = existingPaths.get(sp.path)!;
-            const idx = updated.findIndex(u => u.id === p.id);
-            updated[idx] = { ...p, updatedAt: sp.lastModified };
-            updatedCount++;
-          }
-        } else {
-          updated.push(createProject({ name: sp.name, path: sp.path, status: 'active' }));
-          newCount++;
-        }
-      }
-      await window.electronAPI.saveProjects(updated);
+      const { newCount, updatedCount } = await scanAndMergeProjects();
       setScanResult(`新增 ${newCount} 个，更新 ${updatedCount} 个`);
     } catch (e) {
       setScanResult(`扫描失败: ${e instanceof Error ? e.message : String(e)}`);
@@ -57,6 +39,18 @@ export default function GeneralTab({ settings, handleChange, cliStatus, onDetect
           <button className="primary" onClick={onDetect}>自动检测</button>
         </div>
         {cliStatus && <div className="form-hint">{cliStatus}</div>}
+      </div>
+      <div className="form-group">
+        <label>美化终端界面</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label className="toggle-switch">
+            <input type="checkbox" checked={settings.beautifyTerminal !== false}
+              onChange={e => handleChange('beautifyTerminal', e.target.checked)} />
+            <span className="toggle-slider" />
+          </label>
+          <span className="text-sm text-muted">{settings.beautifyTerminal !== false ? '对话式界面' : '原始终端'}</span>
+        </div>
+        <div className="form-hint">开启后使用对话式界面替代原始终端显示</div>
       </div>
       <div className="separator" />
       <h3 className="title-sm">字号设置</h3>
