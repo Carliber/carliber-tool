@@ -56,29 +56,49 @@ pub struct VcsDiff {
 }
 
 /// Run a command in cwd with a hard timeout, returning stdout as a string (None on
-/// failure or timeout). Uses a spawned thread + channel so the timeout is enforced
-/// even though std::process::Command has no native timeout. The child is killed on
-/// timeout to avoid orphaned git/svn processes.
+/// failure or timeout). Spawns the child and owns the handle so it can be killed on
+/// timeout — preventing orphaned git/svn processes (the previous thread+output()
+/// version leaked the child on timeout).
 fn run(cwd: &str, program: &str, args: &[&str], timeout_secs: u64) -> Option<String> {
-    use std::sync::mpsc;
-    let (tx, rx) = mpsc::channel();
-    let prog = program.to_string();
-    let arg_owned: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-    let cwd_owned = cwd.to_string();
-    std::thread::spawn(move || {
-        let res = Command::new(&prog)
-            .args(&arg_owned)
-            .current_dir(&cwd_owned)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .output()
-            .ok();
-        let _ = tx.send(res);
-    });
-    match rx.recv_timeout(Duration::from_secs(timeout_secs)) {
-        Ok(Some(output)) => Some(String::from_utf8_lossy(&output.stdout).to_string()),
-        _ => None, // timeout or thread panic — child leaked but caller unblocked
+    use std::process::Stdio;
+    let mut child = match Command::new(program)
+        .args(args)
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(_) => return None,
+    };
+
+    // Wait with timeout; kill the child if it exceeds the deadline.
+    let deadline = std::time::Instant::now() + Duration::from_secs(timeout_secs);
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                // Process exited; drain stdout via wait_with_output (returns
+                // immediately since the child has already terminated).
+                return child
+                    .wait_with_output()
+                    .ok()
+                    .map(|o| String::from_utf8_lossy(&o.stdout).to_string());
+            }
+            Ok(None) => {
+                if std::time::Instant::now() >= deadline {
+                    let _ = child.kill();
+                    let _ = child.wait(); // reap to avoid zombie
+                    return None;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
     }
 }
 
