@@ -12,6 +12,35 @@ export default defineConfig({
     target: 'es2021',
     minify: 'esbuild',
     sourcemap: false,
+    chunkSizeWarningLimit: 600,
+    // Split heavy vendor libs into separate chunks. Tauri loads these via
+    // relative file:// paths so code-splitting is cache/parsing friendly.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // CodeMirror core + language packages (~heaviest dependency)
+          codemirror: [
+            '@codemirror/state',
+            '@codemirror/view',
+            '@codemirror/commands',
+            '@codemirror/language',
+            '@codemirror/autocomplete',
+            '@codemirror/search',
+            '@codemirror/theme-one-dark',
+          ],
+          'codemirror-lang': [
+            '@codemirror/lang-javascript',
+            '@codemirror/lang-css',
+            '@codemirror/lang-html',
+            '@codemirror/lang-json',
+            '@codemirror/lang-markdown',
+            '@codemirror/lang-python',
+          ],
+          // Markdown rendering pipeline
+          markdown: ['react-markdown', 'remark-gfm', 'rehype-sanitize'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,
