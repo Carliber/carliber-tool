@@ -1,36 +1,36 @@
-import { useState, useCallback, useRef, useEffect, useMemo, type MouseEvent, type ReactNode } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
 import './styles/global.css';
 import { AppProvider, useApp } from './context/AppContext';
 import ProjectSelector from './components/ProjectSelector';
-import ClaudeSettings from './components/ClaudeSettings';
+import AgentSettings from './components/AgentSettings';
 import Sidebar from './components/Sidebar';
 import Titlebar from './components/Titlebar';
 import ProjectInfo from './components/ProjectInfo';
-import TerminalPanel from './components/TerminalPanel';
+import VcsPanel from './components/VcsPanel';
+import BlockTerminal from './components/block-terminal/BlockTerminal';
 import { SessionList, SessionDetail } from './components/SessionsView';
 import Settings from './components/Settings';
-import ClaudeChat from './components/ClaudeChat';
-import type { ClaudeChatHandle } from './components/ClaudeChat';
 import StatusBar from './components/StatusBar';
 import FileEditor from './components/FileEditor';
 import { createRoot } from 'react-dom/client';
 import { createProject, openDirectoryPicker } from './utils/storage';
-import type { FileEntry } from './types/electron';
+import * as api from './lib/tauri-api';
+import type { FileEntry } from './types/api';
 
 const hash = window.location.hash;
 
-// Global error reporting to main process
+// Global error reporting to the Rust backend log.
 window.onerror = (message, source, line, col, error) => {
-  window.electronAPI?.reportError?.(String(message), source || '', line || 0, col || 0, error);
+  console.error('[onerror]', message, source, line, col, error);
 };
 window.addEventListener('unhandledrejection', (e) => {
-  window.electronAPI?.reportError?.(`Unhandled rejection: ${e.reason}`, '', 0, 0, undefined);
+  console.error('[unhandledrejection]', e.reason);
 });
 
 if (hash === '#project-selector') {
   createRoot(document.getElementById('root')!).render(<ProjectSelector />);
-} else if (hash === '#claude-settings') {
-  createRoot(document.getElementById('root')!).render(<ClaudeSettings />);
+} else if (hash === '#agent-settings') {
+  createRoot(document.getElementById('root')!).render(<AgentSettings />);
 } else if (hash.startsWith('#workspace/')) {
   const projectId = hash.replace('#workspace/', '');
   createRoot(document.getElementById('root')!).render(
@@ -43,19 +43,19 @@ if (hash === '#project-selector') {
     <AppProvider>
       <Hub />
     </AppProvider>
-  );
+);
 }
 
 function Hub() {
   return (
     <div className="app-root">
-      <Titlebar title="Claude Tool" />
+      <Titlebar title="carliber-tool" />
       <div className="app-body">
         <div className="empty-workspace">
-          <h2>Claude Tool</h2>
+          <h2>carliber-tool</h2>
           <p className="text-muted">选择或创建项目开始</p>
           <button className="primary"
-            onClick={() => window.electronAPI.openProjectSelector()}>
+            onClick={() => api.openProjectSelector()}>
             打开项目
           </button>
         </div>
@@ -84,7 +84,6 @@ function Workspace() {
   addProjectRef.current = addProject;
   const openSectionsRef = useRef(openSections);
   openSectionsRef.current = openSections;
-  const chatRef = useRef<ClaudeChatHandle>(null);
 
   const activeFile = activeFileIndex >= 0 ? openFiles[activeFileIndex] ?? null : null;
 
@@ -109,7 +108,7 @@ function Workspace() {
     });
   }, [openFiles]);
 
-  const openSettingsTab = useCallback((kind: 'app-settings' | 'claude-global') => {
+  const openSettingsTab = useCallback((kind: 'app-settings' | 'agent-global') => {
     const virtualPath = `__virtual__::${kind}`;
     const name = kind === 'app-settings' ? '选项' : '设置';
     const existing = openFiles.findIndex(f => f.path === virtualPath);
@@ -133,24 +132,25 @@ function Workspace() {
     if (!dir) return;
     const existing = stateRef.current.projects.find(p => p.path === dir);
     if (existing) {
-      window.electronAPI.selectProject(existing.id);
+      void api.selectProject(existing.id);
     } else {
       const clean = dir.replace(/[/\\]+$/, '');
       const name = clean.split(/[/\\]/).pop() || clean;
       const proj = createProject({ name, path: dir });
       await addProjectRef.current(proj);
-      window.electronAPI.selectProject(proj.id);
+      void api.selectProject(proj.id);
     }
   }, []);
 
   const handleOpenRecent = useCallback((id: string) => {
     setShowFileMenu(false);
-    window.electronAPI.selectProject(id);
+    void api.selectProject(id);
   }, []);
+
 
   useEffect(() => {
     if (!showFileMenu) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: globalThis.MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('.dropdown-trigger')) setShowFileMenu(false);
     };
@@ -165,7 +165,8 @@ function Workspace() {
     });
   }, [updateSettings]);
 
-  const toggleSection = useCallback((tab: string) => {
+  const toggleSection = useCallback((tab?: string) => {
+    if (!tab) return;
     setOpenSections(prev => {
       const next = new Set(prev);
       if (next.has(tab)) next.delete(tab); else next.add(tab);
@@ -173,10 +174,10 @@ function Workspace() {
     });
   }, []);
 
-  const handleResizeStart = useCallback((side: 'left' | 'right', e: MouseEvent) => {
+  const handleResizeStart = useCallback((side: 'left' | 'right', e: ReactMouseEvent) => {
     e.preventDefault();
     draggingRef.current = { side, startX: e.clientX, startWidth: side === 'left' ? sidebarWidth : rightPanelWidth };
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: globalThis.MouseEvent) => {
       if (!draggingRef.current) return;
       const { side: s, startX: sx, startWidth: sw } = draggingRef.current;
       const delta = ev.clientX - sx;
@@ -266,7 +267,7 @@ function Workspace() {
           <div className={`menubar-item ${activeFile?.kind === 'app-settings' ? 'active' : ''}`} onClick={() => openSettingsTab('app-settings')}>
             选项
           </div>
-          <div className={`menubar-item ${activeFile?.kind === 'claude-global' ? 'active' : ''}`} onClick={() => openSettingsTab('claude-global')}>
+          <div className={`menubar-item ${activeFile?.kind === 'agent-global' ? 'active' : ''}`} onClick={() => openSettingsTab('agent-global')}>
             设置
           </div>
         </div>
@@ -276,9 +277,9 @@ function Workspace() {
             {project.name}
           </div>
           <div className="titlebar-controls">
-            <button className="titlebar-btn" onClick={() => window.electronAPI.minimizeWindow()} title="最小化">&#x2500;</button>
-            <button className="titlebar-btn" onClick={() => window.electronAPI.maximizeWindow()} title="最大化">&#x25A1;</button>
-            <button className="titlebar-btn titlebar-btn-close" onClick={() => window.electronAPI.closeWindow()} title="关闭">&#x2715;</button>
+            <button className="titlebar-btn" onClick={() => api.minimizeWindow()} title="最小化">&#x2500;</button>
+            <button className="titlebar-btn" onClick={() => api.maximizeWindow()} title="最大化">&#x25A1;</button>
+            <button className="titlebar-btn titlebar-btn-close" onClick={() => api.closeWindow()} title="关闭">&#x2715;</button>
           </div>
         </div>
       </div>
@@ -316,15 +317,15 @@ function Workspace() {
           </div>
           <div className="workspace-content">
             <div className="workspace-terminal" style={{ display: (openFiles.length > 0 || activeSessionId) ? 'none' : 'flex' }}>
-              {state.settings.beautifyTerminal !== false ? <ClaudeChat ref={chatRef} /> : <TerminalPanel />}
+              <BlockTerminal />
             </div>
             {openFiles.length > 0 && !activeSessionId && (
               <div className="workspace-editor">
                 <div className="editor-tab-panels">
                   {openFiles.map((f, i) => (
                     <div key={f.path} style={{ display: i === activeFileIndex ? 'contents' : 'none' }}>
-                      {f.kind === 'app-settings' || f.kind === 'claude-global' ? (
-                        <Settings key={f.path} mode={f.kind === 'app-settings' ? 'app' : 'claude-global'} />
+                      {f.kind === 'app-settings' || f.kind === 'agent-global' ? (
+                        <Settings key={f.path} mode={f.kind === 'app-settings' ? 'app' : 'agent-global'} />
                       ) : (
                         <FileEditor
                           file={f}
@@ -353,10 +354,13 @@ function Workspace() {
               <ProjectInfo />
             </AccordionSection>
             <AccordionSection title="会话记录" id="sessions" open={openSections.has('sessions')} onToggle={toggleSection}>
-              <SessionList onOpenSession={(id) => { setActiveSessionId(id); chatRef.current?.loadSession(id); }} />
+              <SessionList onOpenSession={(id) => setActiveSessionId(id)} />
+            </AccordionSection>
+            <AccordionSection title="版本控制" id="vcs" open={openSections.has('vcs')} onToggle={toggleSection}>
+              <VcsPanel />
             </AccordionSection>
             <AccordionSection title="项目配置" id="config" open={openSections.has('config')} onToggle={toggleSection}>
-              <Settings mode="claude-project" />
+              <Settings mode="agent-project" />
             </AccordionSection>
             </div>
           </>
@@ -366,10 +370,10 @@ function Workspace() {
     </div>
   );
 }
-
 const sectionIcons: Record<string, ReactNode> = {
   info: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/><path d="M8 7v4M8 5v.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>,
   sessions: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M5 6h6M5 8.5h4M5 11h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+  vcs: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="4" cy="12" r="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="12" cy="8" r="2" stroke="currentColor" strokeWidth="1.3"/><path d="M6 4.5L10 7M6 11.5L10 8.5" stroke="currentColor" strokeWidth="1.3"/></svg>,
   config: <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
 };
 

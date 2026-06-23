@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo, memo, type MouseEvent } from 'react';
-import type { FileEntry } from '../types/electron';
+import type { FileEntry } from '../types/api';
+import * as api from '../lib/tauri-api';
 
 interface TreeNode {
   id: string;
@@ -114,7 +115,7 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
 
   const loadChildren = useCallback(async (dirPath: string): Promise<TreeNode[]> => {
     try {
-      const entries = await window.electronAPI.readDir(dirPath);
+      const entries = await api.readDir(dirPath);
       return entries.map(e => ({
         id: e.path,
         name: e.name,
@@ -133,9 +134,10 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
   useEffect(() => { loadRoot(); }, [loadRoot]);
 
   useEffect(() => {
-    window.electronAPI.watchDir(projectPath);
+    api.watchDir(projectPath);
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const remove = window.electronAPI.onFsChange(() => {
+    let unsub: (() => void) | null = null;
+    api.onFsChange(() => {
       if (timer) return;
       timer = setTimeout(() => {
         timer = null;
@@ -152,11 +154,11 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
         };
         setTree(current => { refreshExpanded(current); return current; });
       }, 200);
-    });
+    }).then(u => { unsub = u; });
     return () => {
       if (timer) clearTimeout(timer);
-      remove();
-      window.electronAPI.unwatchDir(projectPath);
+      if (unsub) unsub();
+      api.unwatchDir(projectPath);
     };
   }, [projectPath, loadRoot, loadChildren]);
 
@@ -217,8 +219,8 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
     const fullPath = newItem.dirPath + pathSep(newItem.dirPath) + trimmed;
     try {
       await (newItem.type === 'file'
-        ? window.electronAPI.createFile(fullPath)
-        : window.electronAPI.createDir(fullPath));
+        ? api.createFile(fullPath)
+        : api.createDir(fullPath));
     } catch (e) {
       alert(`创建失败: ${e instanceof Error ? e.message : String(e)}`);
     }
@@ -231,7 +233,7 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
     const newPath = parentDir(id) + pathSep(id) + trimmed;
     if (newPath !== id) {
       try {
-        await window.electronAPI.renamePath(id, newPath);
+        await api.renamePath(id, newPath);
       } catch (e) {
         alert(`重命名失败: ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -243,7 +245,7 @@ export default function FileTree({ projectPath, onFileSelect, activeFilePath }: 
     const msg = node.type === 'dir' ? `删除文件夹 "${node.name}" 及其所有内容？` : `删除文件 "${node.name}"？`;
     if (!confirm(msg)) return;
     try {
-      await window.electronAPI.deletePath(node.path);
+      await api.deletePath(node.path);
     } catch (e) {
       alert(`删除失败: ${e instanceof Error ? e.message : String(e)}`);
     }

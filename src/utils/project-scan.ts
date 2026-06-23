@@ -1,16 +1,17 @@
 import { createProject } from './storage';
-import type { ScannedProject, Project } from '../types/electron';
+import * as api from '../lib/tauri-api';
+import type { ScannedProject, Project } from '../types/api';
 
-export async function scanNewClaudeProjects(): Promise<ScannedProject[]> {
-  const scanned = await window.electronAPI.scanClaudeProjects();
-  const existing = await window.electronAPI.getProjects();
+export async function scanNewOmpProjects(): Promise<ScannedProject[]> {
+  const scanned = await api.scanOmpProjects();
+  const existing = await api.getProjects();
   const existingPaths = new Set(existing.map(p => p.path));
   return scanned.filter(p => !existingPaths.has(p.path));
 }
 
 export async function scanAndMergeProjects(): Promise<{ newCount: number; updatedCount: number }> {
-  const scanned = await window.electronAPI.scanClaudeProjects();
-  const existing = await window.electronAPI.getProjects();
+  const scanned = await api.scanOmpProjects();
+  const existing = await api.getProjects();
   const existingPaths = new Map(existing.map(p => [p.path, p] as const));
   const updated = [...existing];
   let newCount = 0;
@@ -28,14 +29,17 @@ export async function scanAndMergeProjects(): Promise<{ newCount: number; update
       newCount++;
     }
   }
-  await window.electronAPI.saveProjects(updated);
+  await api.saveProjects(updated);
   return { newCount, updatedCount };
 }
 
 export async function importScannedProjects(projects: ScannedProject[]): Promise<void> {
-  const all = await window.electronAPI.getProjects();
+  const all = await api.getProjects();
   for (const cp of projects) {
     all.push(createProject({ name: cp.name, path: cp.path, status: 'active' }));
   }
-  await window.electronAPI.saveProjects(all);
+  await api.saveProjects(all);
 }
+
+// Keep old name as a thin alias for any lingering call sites.
+export const scanNewClaudeProjects = scanNewOmpProjects;

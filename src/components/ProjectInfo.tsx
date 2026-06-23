@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { openDirectory, openNativeTerminal } from '../utils/storage';
-import type { Project } from '../types/electron';
+import * as api from '../lib/tauri-api';
+import type { Project } from '../types/api';
 import ProjectEditDialog from './ProjectEditDialog';
 
 export default function ProjectInfo() {
@@ -12,7 +13,7 @@ export default function ProjectInfo() {
 
   useEffect(() => {
     if (project) {
-      window.electronAPI.getLastSessionTime(project.path).then(setLastSessionTime);
+      api.getLastSessionTime(project.path).then(setLastSessionTime);
     }
   }, [project?.path]);
 

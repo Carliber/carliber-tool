@@ -1,6 +1,5 @@
-import type { Project, AppConfig } from '../types/electron';
-
-const api = window.electronAPI;
+import type { Project, AppConfig } from '../types/api';
+import * as api from '../lib/tauri-api';
 
 export function generateId(): string {
   return crypto.randomUUID();
@@ -11,7 +10,7 @@ export async function loadProjects(): Promise<Project[]> {
 }
 
 export async function saveProjects(projects: Project[]): Promise<void> {
-  return api.saveProjects(projects);
+  await api.saveProjects(projects);
 }
 
 export async function loadConfig(): Promise<AppConfig> {
@@ -19,7 +18,7 @@ export async function loadConfig(): Promise<AppConfig> {
 }
 
 export async function saveConfig(config: AppConfig): Promise<void> {
-  return api.saveConfig(config);
+  await api.saveConfig(config);
 }
 
 export function createProject({ name, path, description, tags, status }: {
@@ -52,7 +51,7 @@ export async function openDirectory(path: string): Promise<void> {
 }
 
 export async function openNativeTerminal(cwd: string): Promise<void> {
-  return api.openNativeTerminal(cwd);
+  await api.openNativeTerminal(cwd);
 }
 
 export async function openDirectoryPicker(): Promise<string | null> {
@@ -63,8 +62,8 @@ export async function openFilePicker(): Promise<string | null> {
   return api.openFilePicker();
 }
 
-export async function detectClaudeCli(): Promise<string | null> {
-  return api.detectClaudeCli();
+export async function detectOmpCli(): Promise<string | null> {
+  return api.detectOmpCli();
 }
 
 export async function exportBackup(): Promise<boolean> {

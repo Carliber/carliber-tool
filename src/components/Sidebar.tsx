@@ -1,6 +1,6 @@
 import { useApp } from '../context/AppContext';
 import FileTree from './FileTree';
-import type { FileEntry } from '../types/electron';
+import type { FileEntry } from '../types/api';
 
 interface SidebarProps {
   onFileSelect: (entry: FileEntry) => void;

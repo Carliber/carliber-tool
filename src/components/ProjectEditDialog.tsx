@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { createProject, updateProject, openDirectoryPicker } from '../utils/storage';
-import type { Project } from '../types/electron';
+import type { Project } from '../types/api';
 
 const STATUS_OPTIONS = [
   { value: 'active', label: '进行中' },

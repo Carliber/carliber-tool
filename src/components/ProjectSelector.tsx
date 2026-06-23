@@ -1,24 +1,25 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatTime } from '../utils/format';
-import type { Project, ScannedProject } from '../types/electron';
+import type { Project, ScannedProject } from '../types/api';
 import ProjectEditDialog from './ProjectEditDialog';
 import Titlebar from './Titlebar';
-import { scanNewClaudeProjects, importScannedProjects } from '../utils/project-scan';
+import { scanNewOmpProjects, importScannedProjects } from '../utils/project-scan';
+import * as api from '../lib/tauri-api';
 
 export default function ProjectSelector() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [search, setSearch] = useState('');
   const [editProject, setEditProject] = useState<Partial<Project> | null>(null);
   const [showImport, setShowImport] = useState(false);
-  const [claudeProjects, setClaudeProjects] = useState<ScannedProject[]>([]);
+  const [ompProjects, setOmpProjects] = useState<ScannedProject[]>([]);
   const [sessionTimes, setSessionTimes] = useState<Record<string, string | null>>({});
 
   const loadProjects = async () => {
-    const ps = await window.electronAPI.getProjects();
+    const ps = await api.getProjects();
     setProjects(ps);
     // Load session times in background — don't block rendering
     Promise.all(ps.map(async (p) => {
-      const t = await window.electronAPI.getLastSessionTime(p.path);
+      const t = await api.getLastSessionTime(p.path);
       return [p.id, t] as const;
     })).then(entries => {
       const times: Record<string, string | null> = {};
@@ -33,21 +34,21 @@ export default function ProjectSelector() {
 
   const reload = () => loadProjects();
 
-  const handleScanClaude = async () => {
-    const newOnes = await scanNewClaudeProjects();
-    setClaudeProjects(newOnes);
+  const handleScanOmp = async () => {
+    const newOnes = await scanNewOmpProjects();
+    setOmpProjects(newOnes);
     setShowImport(true);
   };
 
   const handleImportAll = async () => {
-    await importScannedProjects(claudeProjects);
+    await importScannedProjects(ompProjects);
     setShowImport(false);
     reload();
   };
 
   const handleImportOne = async (cp: ScannedProject) => {
     await importScannedProjects([cp]);
-    setClaudeProjects(prev => prev.filter(p => p.path !== cp.path));
+    setOmpProjects(prev => prev.filter(p => p.path !== cp.path));
     reload();
   };
 
@@ -66,16 +67,16 @@ export default function ProjectSelector() {
   }, [projects, search]);
 
   const handleSave = async (project: Project) => {
-    const all = await window.electronAPI.getProjects();
+    const all = await api.getProjects();
     all.push(project);
-    await window.electronAPI.saveProjects(all);
+    await api.saveProjects(all);
     setEditProject(null);
     reload();
   };
 
   const handleDelete = async (id: string) => {
-    const all = await window.electronAPI.getProjects();
-    await window.electronAPI.saveProjects(all.filter(p => p.id !== id));
+    const all = await api.getProjects();
+    await api.saveProjects(all.filter(p => p.id !== id));
     reload();
   };
 
@@ -89,7 +90,7 @@ export default function ProjectSelector() {
           <input className="selector-search" placeholder="搜索项目..."
             value={search} onChange={e => setSearch(e.target.value)} />
           <button className="primary" onClick={() => setEditProject({})}>+ 新建项目</button>
-          <button onClick={handleScanClaude}>扫描 Claude 会话</button>
+          <button onClick={handleScanOmp}>扫描 omp 会话</button>
         </div>
 
         <div className="selector-grid">
@@ -99,7 +100,7 @@ export default function ProjectSelector() {
             </div>
           )}
           {filtered.map(p => (
-            <div key={p.id} className="card project-card" onClick={() => window.electronAPI.selectProject(p.id)}>
+            <div key={p.id} className="card project-card" onClick={() => api.selectProject(p.id)}>
               <div className="project-card-header">
                 <span className="project-card-name">{p.name}</span>
               </div>
@@ -123,17 +124,17 @@ export default function ProjectSelector() {
           ))}
         </div>
 
-        {showImport && claudeProjects.length > 0 && (
+        {showImport && ompProjects.length > 0 && (
           <div className="import-panel">
             <div className="import-header">
-              <span className="title-sm">发现 {claudeProjects.length} 个未导入的 Claude 项目</span>
+              <span className="title-sm">发现 {ompProjects.length} 个未导入的 omp 项目</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="primary" onClick={handleImportAll}>全部导入</button>
                 <button onClick={() => setShowImport(false)}>关闭</button>
               </div>
             </div>
             <div className="import-list">
-              {claudeProjects.map(cp => (
+              {ompProjects.map(cp => (
                 <div key={cp.path} className="import-row">
                   <div>
                     <span className="text-bold">{cp.name}</span>
@@ -146,9 +147,9 @@ export default function ProjectSelector() {
             </div>
           </div>
         )}
-        {showImport && claudeProjects.length === 0 && (
+        {showImport && ompProjects.length === 0 && (
           <div className="import-panel">
-            <span className="text-muted">没有发现新的 Claude 项目</span>
+            <span className="text-muted">没有发现新的 omp 项目</span>
             <button className="btn-sm" onClick={() => setShowImport(false)} style={{ marginLeft: 8 }}>关闭</button>
           </div>
         )}

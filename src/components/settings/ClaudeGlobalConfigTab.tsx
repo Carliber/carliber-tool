@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { CLAUDE_CONFIG_SPEC, EXCLUDED_KEYS, ENV_SPEC } from './config-spec';
 import ConfigItem from './ConfigItem';
-import type { ClaudeSettings } from '../../types/electron';
+import type { ClaudeSettings } from '../../types/api';
 
 export default function ClaudeGlobalConfigTab({ settings, update, updateEnv }: {
   settings: ClaudeSettings; update: (k: string, v: unknown) => void;

@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import type { Project, AppConfig } from '../types/electron';
+import type { Project, AppConfig } from '../types/api';
 import { loadProjects, saveProjects, loadConfig, saveConfig } from '../utils/storage';
 
 interface AppState {
@@ -37,7 +37,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 const initialState: AppState = {
   projects: [],
   currentProjectId: null,
-  settings: { theme: 'light', claudeCliPath: 'claude', dataDir: '', windowWidth: 1200, windowHeight: 800, windowX: 0, windowY: 0, lastPage: 'info', uiFontSize: 14, editorFontSize: 13, terminalFontSize: 14, treeFontSize: 13 },
+  settings: { theme: 'light', ompCliPath: 'omp', dataDir: '', windowWidth: 1200, windowHeight: 800, windowX: 0, windowY: 0, lastPage: 'info', uiFontSize: 14, editorFontSize: 13, terminalFontSize: 14, treeFontSize: 13 },
   activePage: 'info',
   loaded: false,
 };

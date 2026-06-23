@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ClaudeSettings } from '../../types/electron';
+import type { ClaudeSettings } from '../../types/api';
 
 export function PermissionsEditor({ permissions, update }: { permissions: { allow?: string[]; deny?: string[] }; update: (k: string, v: unknown) => void }) {
   const allowList: string[] = permissions.allow || [];

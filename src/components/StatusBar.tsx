@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { BUSY_TIMEOUT } from '../hooks/useClaudeState';
+import * as api from '../lib/tauri-api';
 
 interface ToolCount { read: number; edit: number; bash: number; write: number }
 interface StatusState {
@@ -85,11 +86,11 @@ export default function StatusBar() {
   const updateGitBranch = useCallback(async (cwd: string) => {
     if (!cwd) return;
     try {
-      const entries = await window.electronAPI.readDir(cwd);
+      const entries = await api.readDir(cwd);
       const hasGit = entries.some(e => e.name === '.git' && e.type === 'dir');
       if (!hasGit) { setStatus(p => ({ ...p, gitBranch: '', gitDirty: false })); return; }
       const headFile = `${cwd}/.git/HEAD`;
-      const content = await window.electronAPI.readFile(headFile);
+      const content = await api.readFile(headFile);
       if (content.error || !content.content) return;
       const match = content.content.match(/ref:\s*refs\/heads\/(.+)/);
       if (match) {
@@ -116,35 +117,33 @@ export default function StatusBar() {
 
   useEffect(() => {
     if (!project) return;
-    const unsubData = window.electronAPI.onPtyData((_, data) => {
+    let cancelled = false;
+    let unsubData: (() => void) | null = null;
+    let unsubExit: (() => void) | null = null;
+
+    api.onPtyData((_sid, data) => {
       const clean = stripAnsi(data);
       if (!clean.trim()) return;
 
       const model = detectModel(clean);
       const mode = detectMode(clean);
       const tool = detectToolUse(clean);
-
       const ctxMatch = clean.match(CONTEXT_PATTERN);
 
       if (PROMPT_PATTERN.test(clean)) {
-        setStatus(prev => ({
-          ...prev, status: 'idle', statusText: '',
-          model: model || prev.model, mode: mode || prev.mode,
-        }));
+        setStatus(prev => ({ ...prev, status: 'idle', statusText: '',
+          model: model || prev.model, mode: mode || prev.mode }));
         lastBusyRef.current = 0;
         return;
       }
-
       if (SHELL_PROMPT_PATTERN.test(clean) && !PROMPT_PATTERN.test(clean)) {
         setStatus(prev => ({ ...prev, status: 'idle', statusText: '', model: '', mode: '' }));
         lastBusyRef.current = 0;
         return;
       }
-
       setStatus(prev => {
         const nextToolCount = { ...prev.toolCount };
         if (tool) nextToolCount[tool]++;
-
         let ctxPercent = prev.contextPercent;
         let ctxUsed = prev.contextUsed;
         let ctxTotal = prev.contextTotal;
@@ -153,7 +152,6 @@ export default function StatusBar() {
           ctxTotal = parseFloat(ctxMatch[2]);
           ctxPercent = ctxTotal > 0 ? Math.round((ctxUsed / ctxTotal) * 100) : 0;
         }
-
         for (const [pat, st, text] of STATUS_PATTERNS) {
           if (pat.test(clean)) {
             lastBusyRef.current = Date.now();
@@ -166,13 +164,13 @@ export default function StatusBar() {
         return { ...prev, toolCount: nextToolCount, contextPercent: ctxPercent,
           contextUsed: ctxUsed, contextTotal: ctxTotal };
       });
-    });
+    }).then(u => { if (cancelled) u(); else unsubData = u; });
 
-    const unsubExit = window.electronAPI.onPtyExit(() => {
+    api.onPtyExit(() => {
       setStatus(prev => ({ ...prev, status: 'idle', statusText: '', model: '', mode: '' }));
-    });
+    }).then(u => { if (cancelled) u(); else unsubExit = u; });
 
-    return () => { unsubData(); unsubExit(); };
+    return () => { cancelled = true; unsubData?.(); unsubExit?.(); };
   }, [project?.id]);
 
   useEffect(() => {
@@ -186,7 +184,7 @@ export default function StatusBar() {
     return () => clearInterval(timer);
   }, [status.status]);
 
-  const modelName = status.model || 'Claude Code';
+  const modelName = status.model || 'omp';
   const projectName = project?.name || '';
   const branchDisplay = status.gitBranch
     ? `git:(${status.gitBranch}${status.gitDirty ? '*' : ''})`

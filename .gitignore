@@ -1,7 +1,33 @@
+# 依赖
 node_modules/
+
+# 构建产物
 dist/
-.claude/
+src-tauri/target/
+src-tauri/gen/
+
+# 临时与日志
 *.tmp
 *.log
-_legacy/target/
-_legacy/dependency-reduced-pom.xml
+
+# AI 工具 / 辅助文档（不随项目上传）
+.claude/
+.cursor/
+.idea/
+.vscode/
+CLAUDE.md
+AGENTS.md
+DESIGN.md
+*.code-workspace
+
+# 本地环境 / 密钥（保险）
+.env
+.env.*
+!.env.example
+*.local
+*.key
+*.pem
+
+# OS 杂项
+.DS_Store
+Thumbs.db

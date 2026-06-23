@@ -18,7 +18,7 @@ export const CLAUDE_CONFIG_SPEC: Record<string, ConfigSpec> = {
   fastMode: { label: '快速模式', type: 'boolean', group: 'core', desc: '使用快速输出模式' },
   fastModePerSessionOptIn: { label: '每次会话确认快速模式', type: 'boolean', group: 'core', desc: '每次会话都需要手动选择启用快速模式' },
   language: { label: '语言', type: 'string', group: 'core', desc: 'Claude 的首选响应语言' },
-  defaultMode: { label: '默认模式', type: 'string', group: 'core', desc: 'Claude Code 启动时的权限模式', options: [
+  defaultMode: { label: '默认模式', type: 'string', group: 'core', desc: '启动时的权限模式', options: [
     { value: '', label: '默认' }, { value: 'auto', label: '自动' }, { value: 'plan', label: '规划' },
   ]},
   defaultShell: { label: '默认 Shell', type: 'string', group: 'core', desc: '! 命令的默认 Shell', options: [

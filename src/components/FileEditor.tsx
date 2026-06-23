@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter } from '@codemirror/view';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, Compartment, type Extension } from '@codemirror/state';
 import { javascript } from '@codemirror/lang-javascript';
 import { css } from '@codemirror/lang-css';
 import { html } from '@codemirror/lang-html';
@@ -12,7 +12,8 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
-import type { FileEntry } from '../types/electron';
+import type { FileEntry } from '../types/api';
+import * as api from '../lib/tauri-api';
 
 interface FileEditorProps {
   file: FileEntry;
@@ -21,10 +22,10 @@ interface FileEditorProps {
   fontSize?: number;
 }
 
-function getLangExtension(filename: string) {
+function getLangExtension(filename: string): Extension {
   const dot = filename.lastIndexOf('.');
   const ext = dot >= 0 ? filename.slice(dot) : '';
-  const map: Record<string, () => unknown> = {
+  const map: Record<string, () => Extension> = {
     '.js': javascript, '.jsx': javascript, '.mjs': javascript, '.cjs': javascript,
     '.ts': () => javascript({ typescript: true }),
     '.tsx': () => javascript({ typescript: true, jsx: true }),
@@ -53,13 +54,13 @@ export default function FileEditor({ file, onClose, theme = 'light', fontSize = 
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const originalContent = useRef<string>('');
-  const saveFileRef = useRef<() => void>();
+  const saveFileRef = useRef<() => void>(() => {});
 
   saveFileRef.current = async () => {
     if (!viewRef.current) return;
     setSaving(true);
     const text = viewRef.current.state.doc.toString();
-    const ok = await window.electronAPI.writeFile(file.path, text);
+    const ok = await api.writeFile(file.path, text);
     if (ok) {
       originalContent.current = text;
       setDirty(false);
@@ -69,7 +70,7 @@ export default function FileEditor({ file, onClose, theme = 'light', fontSize = 
 
   useEffect(() => {
     let cancelled = false;
-    window.electronAPI.readFile(file.path).then(result => {
+    api.readFile(file.path).then(result => {
       if (cancelled) return;
       if (result.error) { setError(result.error); return; }
       setContent(result.content);

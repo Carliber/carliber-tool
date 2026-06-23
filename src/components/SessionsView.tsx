@@ -2,7 +2,8 @@ import { useState, useEffect, type MouseEvent } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatTime } from '../utils/format';
 import { isClaudeBusy, switchToSession } from '../hooks/useClaudeState';
-import type { ClaudeSession, SessionMessage } from '../types/electron';
+import type { ClaudeSession, SessionMessage } from '../types/api';
+import * as api from '../lib/tauri-api';
 
 export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => void }) {
   const { state } = useApp();
@@ -15,22 +16,22 @@ export function SessionList({ onOpenSession }: { onOpenSession: (id: string) => 
 
   const loadSessions = async () => {
     if (!project) return;
-    const list = await window.electronAPI.getSessions(project.path);
+    const list = await api.getSessions(project.path);
     setSessions(list);
   };
 
   const handleDelete = async (e: MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (!project || !confirm('删除此会话？不可恢复。')) return;
-    await window.electronAPI.deleteSession(project.path, sessionId);
+    await api.deleteSession(project.path, sessionId);
     loadSessions();
   };
 
   const handleSwitchSession = (e: MouseEvent, sessionId: string) => {
     e.stopPropagation();
     if (!project) return;
-    const cliPath = state.settings.claudeCliPath || 'claude';
-    if (isClaudeBusy() && !confirm('Claude 正在执行任务，切换将中断当前操作。继续？')) return;
+    const cliPath = state.settings.ompCliPath || 'omp';
+    if (isClaudeBusy() && !confirm('omp 正在执行任务，切换将中断当前操作。继续？')) return;
     switchToSession(project.id, sessionId, cliPath);
   };
 
@@ -72,11 +73,11 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
 
   useEffect(() => {
     if (!project) return;
-    window.electronAPI.getSessions(project.path).then(list => {
+    api.getSessions(project.path).then(list => {
       const s = list.find(s => s.sessionId === sessionId);
       if (s) setTitle(s.title);
     });
-    window.electronAPI.getSessionMessages(project.path, sessionId).then(setMessages);
+    api.getSessionMessages(project.path, sessionId).then(setMessages);
   }, [project?.path, sessionId]);
 
   return (
@@ -90,7 +91,7 @@ export function SessionDetail({ sessionId, onClose }: { sessionId: string; onClo
         {messages.map((m, i) => (
           <div key={i} className={`message message-${m.role}`}>
             <div className="message-role">
-              {m.role === 'user' ? '👤 你' : m.role === 'assistant' ? '🤖 Claude' : '📝 系统'}
+              {m.role === 'user' ? '👤 你' : m.role === 'assistant' ? '🤖 omp' : '📝 系统'}
             </div>
             <div className="message-text">{m.text}</div>
             {m.ts && <div className="message-time">{new Date(m.ts).toLocaleString('zh-CN')}</div>}

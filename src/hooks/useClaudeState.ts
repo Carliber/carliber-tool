@@ -1,8 +1,9 @@
 import { stripAnsi } from '../utils/ansi';
+import * as api from '../lib/tauri-api';
 
 export const BUSY_TIMEOUT = 4000;
 
-export const CLAUDE_ACTIVE_PATTERN = /Claude.*Code|claude.*v\d/i;
+export const CLAUDE_ACTIVE_PATTERN = /Claude.*Code|claude.*v\d|omp/i;
 export const CLAUDE_PROMPT_PATTERN = /❯/;
 export const SHELL_PROMPT_PATTERN = /(?:\$\s|[#$>]\s*$)/;
 export const BUSY_PATTERN = /Processing|Thinking|Reading|Generating|analyzing|tool use/i;
@@ -18,12 +19,14 @@ export function isClaudeBusy(): boolean {
   return claudeActive && (Date.now() - lastBusySignal < BUSY_TIMEOUT);
 }
 
+/// Resume an omp session inside the block terminal by writing to the PTY.
+/// omp uses the same `--resume <id>` flag as Claude Code.
 export function switchToSession(projectId: string, sessionId: string, cliPath: string) {
   if (claudeActive) {
-    window.electronAPI.writeTerminal(projectId, '\x1b');
-    window.electronAPI.writeTerminal(projectId, `/resume ${sessionId}\r\n`);
+    void api.writeTerminal(projectId, '\x1b');
+    void api.writeTerminal(projectId, `/resume ${sessionId}\r\n`);
   } else {
-    window.electronAPI.writeTerminal(projectId, `${cliPath} --resume ${sessionId}\r\n`);
+    void api.writeTerminal(projectId, `${cliPath} --resume ${sessionId}\r\n`);
   }
 }
 
