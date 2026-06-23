@@ -113,18 +113,24 @@ pub fn pty_create(
         Ok(c) => c,
         Err(_) => return false,
     };
-    let killer = child; // already Box<dyn Child + Send + Sync>
+    let mut killer = child; // Box<dyn Child + Send + Sync>; mut for kill-on-failure.
 
     let mut reader = match pair.master.try_clone_reader() {
         Ok(r) => r,
-        Err(_) => return false,
+        Err(_) => {
+            let _ = killer.kill();
+            return false;
+        }
     };
     drop(pair.slave);
 
     // Take the writer before moving the master into the registry.
     let writer = match pair.master.take_writer() {
         Ok(w) => w,
-        Err(_) => return false,
+        Err(_) => {
+            let _ = killer.kill();
+            return false;
+        }
     };
 
     // Apply initial size on the master.
