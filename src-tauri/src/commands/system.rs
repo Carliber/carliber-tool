@@ -1,16 +1,16 @@
 // System commands — ported from electron/ipc/system.js.
-// Uses tauri-plugin-dialog for pickers and tauri-plugin-shell for opening paths.
+// Uses tauri-plugin-dialog for pickers and the `open` crate for opening paths.
 
 use crate::state::{ensure_dir, PROJECTS_PATH};
 use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
-use tauri_plugin_shell::ShellExt;
 
+/// Open a path in the OS default handler via the OS default app.
 #[tauri::command]
-pub fn open_directory(path: String, app: AppHandle) {
-    let _ = app.shell().open(path, None);
+pub fn open_directory(path: String, _app: AppHandle) {
+    let _ = open::that(path);
 }
 
 #[tauri::command]

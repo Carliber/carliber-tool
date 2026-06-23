@@ -234,7 +234,6 @@ fn build_tray(app: &AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(w) = app.get_webview_window("main") {
                 let _ = w.show();
@@ -346,7 +345,7 @@ pub fn run() {
                 .map(|(_, p)| p);
             if let Some(p) = last {
                 if let Some(id) = p.get("id").and_then(|v| v.as_str()) {
-                    if let Some(main) = app.get_webview_window("main") {
+                    if let Some(_main) = app.get_webview_window("main") {
                         let app2 = app.handle().clone();
                         let id2 = id.to_string();
                         let name = p
@@ -358,7 +357,7 @@ pub fn run() {
                         tauri::async_runtime::spawn(async move {
                             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                             let app3 = app2.clone();
-                            let label = format!("workspace-{}", id2);
+                            // window label derived inline below; no separate binding needed
                             let name_clone = name.clone();
                             let id3 = id2.clone();
                             let _ = tauri::async_runtime::spawn_blocking(move || {

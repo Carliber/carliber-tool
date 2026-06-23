@@ -4,12 +4,11 @@
 use crate::commands::projects::projects;
 use crate::state::{IGNORED_DIRS, MAX_FILE_SIZE, WATCHERS};
 use serde::Serialize;
-use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Serialize)]
 #[allow(non_snake_case)]

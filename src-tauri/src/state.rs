@@ -112,14 +112,6 @@ pub fn ensure_dir(dir: &Path) {
     }
 }
 
-/// Read and parse a JSON file, returning the fallback on any error. Ported from readJson.
-pub fn read_json<T: serde::de::DeserializeOwned + Default>(path: &Path) -> T {
-    match fs::read_to_string(path) {
-        Ok(s) => serde_json::from_str(&s).unwrap_or_default(),
-        Err(_) => T::default(),
-    }
-}
-
 /// Read a JSON file into a serde_json::Value, returning the provided fallback on error.
 pub fn read_json_value(path: &Path, fallback: Value) -> Value {
     match fs::read_to_string(path) {

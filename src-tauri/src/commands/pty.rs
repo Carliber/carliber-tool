@@ -6,7 +6,6 @@ use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::collections::HashMap;
 use std::io::Read;
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use tauri::{AppHandle, Emitter};

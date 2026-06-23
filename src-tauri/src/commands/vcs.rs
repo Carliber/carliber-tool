@@ -397,7 +397,6 @@ pub fn vcs_log(project_path: String, limit: Option<u32>) -> Vec<VcsLogEntry> {
                 date: String::new(),
                 message: String::new(),
             };
-            let mut in_msg = false;
             for line in raw.lines() {
                 let trimmed = line.trim();
                 if let Some(rest) = trimmed.strip_prefix("r") {
@@ -428,10 +427,10 @@ pub fn vcs_log(project_path: String, limit: Option<u32>) -> Vec<VcsLogEntry> {
                             cur.author = segs[1].to_string();
                             cur.date = segs[2].to_string();
                         }
-                        in_msg = false;
+                        // in_msg state was removed; commit boundary handled by cur.hash.
                     }
                 } else if !cur.hash.is_empty() && trimmed == "Changed paths:" {
-                    in_msg = false;
+                    // SVN log section header — skip, don't accumulate as message.
                 } else if !cur.hash.is_empty() && (trimmed.starts_with("M /") || trimmed.starts_with("A /") || trimmed.starts_with("D /") || trimmed.starts_with("A  /") || trimmed.starts_with("M  /")) {
                     // changed-path line — skip
                 } else if !cur.hash.is_empty() && !trimmed.is_empty() {
