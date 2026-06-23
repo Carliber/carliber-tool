@@ -33,6 +33,8 @@ export function useBlockTerminal(): BlockTerminalState {
   blocksRef.current = blocks;
   const projectIdRef = useRef<string | null>(null);
   projectIdRef.current = project?.id ?? null;
+  // Track whether this hook instance created the PTY so cleanup can kill it.
+  const createdRef = useRef(false);
 
   const appendOutput = useCallback((sessionId: string, chunk: string) => {
     if (sessionId !== projectIdRef.current) return;
@@ -83,13 +85,13 @@ export function useBlockTerminal(): BlockTerminalState {
       unsubExit = ue;
 
       // If a session already exists (e.g. hot reload), just attach.
-      let created = false;
       try {
         created = await api.createTerminal(projectId, project.path, 100, 30);
       } catch {
         created = false;
       }
       if (cancelled) return;
+      createdRef.current = created;
 
       // Inject omp startup command (mirrors the legacy TerminalPanel behaviour).
       const cliPath = state.settings.ompCliPath || 'omp';
@@ -104,6 +106,14 @@ export function useBlockTerminal(): BlockTerminalState {
       cancelled = true;
       unsubData?.();
       unsubExit?.();
+      // Kill the PTY this hook created to avoid leaking shell processes when
+      // switching projects within the same window (close-window cleanup is
+      // handled separately by the backend's kill_by_owner).
+      const sid = projectIdRef.current;
+      if (createdRef.current && sid) {
+        void api.killTerminal(sid);
+        createdRef.current = false;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id]);
